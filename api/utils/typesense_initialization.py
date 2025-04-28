@@ -10,70 +10,59 @@ client = typesense.Client({
         'port': '8108',
         'protocol': 'http'
     }],
-    'connection_timeout_seconds': 2
+    'connection_timeout_seconds': 10
 })
 
-schema = {
-    'name': 'GWAS_stats',
-    'fields': [
-        {'name': '#CHROM', 'type': 'string'},
-        {'name': 'BEG', 'type': 'string'},
-        {'name': 'END', 'type': 'string'},
-        {'name': 'MARKER_ID', 'type': 'string'},
-        {'name': 'MAF', 'type': 'string'},
-        {'name': 'PVALUE', 'type': 'float'},
-        {'name': 'BETA', 'type': 'string'}
-    ],
-    'default_sorting_field': 'PVALUE',
-}
+collection_name = "nodes"
 
-try:
-    client.collections['GWAS_stats'].delete()
-except Exception:
-    pass
+# schema = {
+#   "name": collection_name,
+#   "fields": [
+#     { "name": "label", "type": "string" },
+#     { "name": "type", "type": "string" },
+#     { "name": "description", "type": "string" },
+#     { "name": "internal_id", "type": "string" },
+#     {"name": "gene_symbol", "type": "string" }
+#   ]
+# }
+#
+# try:
+#     client.collections[collection_name].delete()
+#
+# except Exception:
+#     pass
+#
+# client.collections.create(schema)
+#
+#
+# BATCH_SIZE = 100
+# file_path = "../../data/CHRIS_somalogic_descriptive_statistic.tsv.gz"
+# documents = []
+#
+# with gzip.open(file_path, 'rt') as f:
+#     reader = csv.DictReader(f, delimiter='\t')
+#     for i, row in enumerate(reader, start=1):
+#         doc = {
+#             'internal_id': row['protein_id'],
+#             'description': row['TargetFullName'],
+#             'label': row['UniProt'],
+#             'type': 'protein',
+#             'gene_symbol': row['EntrezGeneSymbol'],
+#         }
+#         documents.append(doc)
+#         if i % BATCH_SIZE == 0:
+#             payload = '\n'.join(json.dumps(doc) for doc in documents)
+#             client.collections[collection_name].documents.import_(payload, {'action': 'upsert'})
+#             print("Batch ", i, " imported!")
+#             documents = []
+#
+#     # Final batch
+#     if documents:
+#         payload = '\n'.join(json.dumps(doc) for doc in documents)
+#         client.collections[collection_name].documents.import_(payload, {'action': 'upsert'})
+#
+#
+#
+# print("✅ Import complete.")
 
-client.collections.create(schema)
-
-documents = []
-
-# get pwd
-file_path = "../../data/pheno.3.1.epacts.gz"
-
-def safe_float(val):
-    return float(val) if val != 'NA' else None
-
-with gzip.open(file_path, 'rt') as f:
-    reader = csv.DictReader(f, delimiter = '\t')
-    for row in reader:
-        # Only take #CHROM, BEG, END, MARKER_ID, MAF, PVALUE, BETA
-        row = {
-            '#CHROM': row['#CHROM'],
-            'BEG': row['BEG'],
-            'END': row['END'],
-            'MARKER_ID': row['MARKER_ID'],
-            'MAF': row['MAF'],
-            'PVALUE': float(row['PVALUE']) if row['PVALUE'] != 'NA' else -9999,
-            'BETA': row['BETA']
-        }
-
-        documents.append(row)
-
-    # Bulk import
-    payload = '\n'.join(json.dumps(doc) for doc in documents)
-
-    response = client.collections['GWAS_stats'].documents.import_(
-        payload,
-        {'action': 'upsert'}
-    )
-
-    stats = client.collections['GWAS_stats'].retrieve()
-    print("Document count:", stats['num_documents'])
-
-    response = client.collections['GWAS_stats'].documents.search({
-        'q': '1:787399_G/T',
-        'query_by': 'MARKER_ID',
-        'per_page': 100
-    })
-
-    for hit in response['hits']:
-        print(hit['document'])
+print(client.collections[collection_name].retrieve()["num_documents"])
