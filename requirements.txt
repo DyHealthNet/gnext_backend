@@ -1,0 +1,18 @@
+asgiref @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_47jggogimk/croot/asgiref_1724072471856/work
+certifi==2025.1.31
+charset-normalizer==3.4.1
+Django @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_578q9wrure/croot/django_1731615969522/work
+djangorestframework==3.16.0
+idna==3.10
+numpy==2.2.5
+pandas==2.2.3
+pysam==0.23.0
+python-dateutil==2.9.0.post0
+python-decouple==3.8
+pytz==2025.2
+requests==2.32.3
+six==1.17.0
+sqlparse @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_444946bpsc/croot/sqlparse_1734704466504/work
+typesense==1.0.3
+tzdata==2025.2
+urllib3==2.4.0
