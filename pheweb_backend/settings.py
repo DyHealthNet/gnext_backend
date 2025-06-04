@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-m+8s58hud9#cjl_bvnkg9q+91yby*nujl%c!8%0f7eq(nte&4#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -39,10 +39,17 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'api'
+    'django_extensions',
+    'api',
+    'corsheaders'
 ]
 
+REST_FRAMEWORK = {
+    'URL_FORMAT_OVERRIDE': None,
+}
+
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # ✅ must be above CommonMiddleware
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -51,6 +58,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True # TODO: set to false in production
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'pheweb_backend.urls'
 
@@ -126,6 +136,43 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-SECRET_KEY = config("SECRET_KEY")
-DEBUG = config("DEBUG", cast=bool)
-DATA = config("DATA", cast=str)
+# Typesense config
+TYPESENSE_CONFIG = {
+    "nodes": [{
+        "host": config("TYPESENSE_HOST"),
+        "port": config("TYPESENSE_PORT"),
+        "protocol": "http"
+    }],
+    "api_key": config("TYPESENSE_KEY"),
+    "connection_timeout_seconds": 2
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'django': {
+            'format': '[%(asctime)s] %(levelname)s %(message)s',
+            'datefmt': '%d/%b/%Y %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'django',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'api': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': True,
+        }
+    },
+}

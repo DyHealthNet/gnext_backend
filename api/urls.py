@@ -1,6 +1,14 @@
+from .views.variant_view import PheWASView, VariantAnnotationView
+from .views.overview_view import OverviewDataView
+from .views.trait_view import ManhattanView, QQView
 from django.urls import path
-from api.views.typesense_autocomplete import AutoComplete
+
 
 urlpatterns = [
-    path('autocomplete/', AutoComplete.as_view()),
+    path("variant_phewas/", PheWASView.as_view(), name="variant_phewas"),
+    path("variant_annotation/", VariantAnnotationView.as_view(), name="variant_annotation"),
+    path("overview_stats/", OverviewDataView.as_view(), name="overview_stats"),
+    path("trait_manhattan/", ManhattanView.as_view(), name="trait_manhattan"),
+    path("trait_qq/", QQView.as_view(), name="trait_qq"),
 ]
+

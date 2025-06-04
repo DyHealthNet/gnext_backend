@@ -1,0 +1,6 @@
+name: pheweb_backend
+channels:
+  - conda-forge
+dependencies:
+  - pip
+prefix: /nfs/home/students/l.arend/.conda/envs/pheweb_backend
