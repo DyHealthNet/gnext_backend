@@ -1,0 +1,21 @@
+# Language and tooling
+*.py[cod]
+*$py.class
+__pycache__/
+.mypy_cache
+.pytest_cache
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# Build artifacts
+*.egg-info
+*.egg
+build/
+dist/
+
+# Other
+*.lmdb-lock
