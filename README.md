@@ -2,11 +2,21 @@
 
 # Conda Environment
 
-To create the conda environment, run the following command:
+Create a conda environment using the requirements.txt file
 
-```bash 
-conda env create -f environment.yml
+```bash
+conda create -n pheweb_backend python=3.10
+conda activate pheweb_backend
+pip install -r requirements.txt
 ```
+
+Activate your conda environment
+
+```bash
+conda activate pheweb_backend
+```
+
+
 
 # Typesense Initialization
 
@@ -33,6 +43,9 @@ Run the typesense_initialization.py script to fill the database with the initial
 python typesense_initialization.py
 ```
 
+# Generation of VCF file with all variants
+
+For Pan_UKBB, the Bash script `make_variant_vcf.sh` (in `/nfs/data/Pan_UKBB/`) can be used to generate a VCF file with all variants.
 
 # Annotation of Variants with VEP
 
@@ -56,13 +69,19 @@ docker run -t -i -v /nfs/data/Pan_UKBB/data:/data ensemblorg/ensembl-vep INSTALL
 
 Cache stored in --fasta /opt/vep/.vep/homo_sapiens/113_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz
 
-Annotate file with VEP:
+For the annotation, the Bash script `vep_run.sh` (in `/nfs/data/Pan_UKBB/`) can be used. This creates the `annotated_variants.vcf.bgz` file.
 
-```bash
-docker run -v /nfs/data/Pan_UKBB/data:/data ensemblorg/ensembl-vep vep --cache --offline --input_file --output_file -y GRCh37 --distance 1000 #1000 is a user specific parameter
-```
 
 # Generation of Manhattan and QQ JSON Files
 
 For this, the api/utils/locuszoom/reader.py file needs to be run. This creates new directories with files per GWAS summary statistic.
 
+# Run Django backend
+
+After all preprocessing steps have been completed and the typesense docker container is up, you can run the Django backend.
+
+```bash
+python manage.py runserver 0.0.0.0:5136
+```
+
+Attention: the port needs to be the same than specified in the .env and remember to forward the ports.

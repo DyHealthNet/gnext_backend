@@ -10,7 +10,7 @@ from decouple import config
 collection_name = "entries"
 
 # Config variables
-api_key = config('TYPESENSEl_KEY')
+api_key = config('TYPESENSE_KEY')
 typesense_host = config('TYPESENSE_HOST')
 typesense_port = config('TYPESENSE_PORT')
 
