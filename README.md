@@ -59,5 +59,10 @@ Cache stored in --fasta /opt/vep/.vep/homo_sapiens/113_GRCh37/Homo_sapiens.GRCh3
 Annotate file with VEP:
 
 ```bash
-docker run -v /nfs/data/Pan_UKBB/data:/data ensemblorg/ensembl-vep vep --cache --offline --input_file --output_file -y GRCh37 
+docker run -v /nfs/data/Pan_UKBB/data:/data ensemblorg/ensembl-vep vep --cache --offline --input_file --output_file -y GRCh37 --distance 1000 #1000 is a user specific parameter
 ```
+
+# Generation of Manhattan and QQ JSON Files
+
+For this, the api/utils/locuszoom/reader.py file needs to be run. This creates new directories with files per GWAS summary statistic.
+
