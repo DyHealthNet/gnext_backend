@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'django_extensions',
-    'api',
+    'backend',
     'corsheaders'
 ]
 
@@ -169,7 +169,7 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
-        'api': {
+        'backend': {
             'handlers': ['console'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': True,

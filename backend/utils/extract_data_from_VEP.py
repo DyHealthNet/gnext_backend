@@ -1,14 +1,14 @@
 from decouple import config
 import pysam
-from api.utils.converters import convert_variant_id
+from backend.utils.converters import convert_variant_id
 import gzip
 import logging
 import pandas as pd
 
 
-from api.utils.VEP_consequences import VEP_RANK_DICT
+from backend.utils.VEP_consequences import VEP_RANK_DICT
 
-logger = logging.getLogger('api')
+logger = logging.getLogger('backend')
 
 
 def get_most_severe(consequences):

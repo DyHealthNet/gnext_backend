@@ -63,5 +63,5 @@ def extract_variant_annotation(variant_id):
 #             break
 
 
-t = extract_variant_annotation("12_91999816_C/G")
-print(t)
+#t = extract_variant_annotation("12_91999816_C/G")
+#print(t)

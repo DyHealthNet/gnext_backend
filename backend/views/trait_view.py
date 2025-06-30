@@ -1,15 +1,15 @@
 from django.http import JsonResponse
-from api.utils.extract_data_from_GWAS import extract_phenotype_results_for_variant
-from api.utils.extract_data_from_VEP import extract_variant_annotation
+from backend.utils.extract_data_from_GWAS import extract_phenotype_results_for_variant
+from backend.utils.extract_data_from_VEP import extract_variant_annotation
 from decouple import config
 from rest_framework import generics
 import logging
 import re
 import json
 
-from api.utils.typesense_client import get_phenotype_from_typesense
+from backend.utils.typesense_client import get_phenotype_from_typesense
 
-logger = logging.getLogger('api')
+logger = logging.getLogger('backend')
 
 class ManhattanView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):

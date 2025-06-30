@@ -1,9 +1,9 @@
 # Script containing functions for extracting data from GWAS summary statistics
-from api.utils.typesense_client import get_all_phenotypes_from_typesense
+from backend.utils.typesense_client import get_all_phenotypes_from_typesense
 import pysam
 from decouple import config
 import gzip
-from api.utils.converters import convert_variant_id
+from backend.utils.converters import convert_variant_id
 
 ref_column = config("REF_COLUMN")
 alt_column = config("ALT_COLUMN")

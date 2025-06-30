@@ -4,9 +4,9 @@ from numpy import number
 from rest_framework import generics
 import logging
 import re
-from api.utils.typesense_client import get_number_of_documents
+from backend.utils.typesense_client import get_number_of_documents
 
-logger = logging.getLogger('api')
+logger = logging.getLogger('backend')
 
 class OverviewDataView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):

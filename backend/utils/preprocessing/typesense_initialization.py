@@ -6,17 +6,7 @@ import pandas as pd
 
 from decouple import config
 
-if __name__ == "__main__":
-
-    # Config variables
-    api_key = config('TYPESENSE_KEY')
-    typesense_host = config('TYPESENSE_HOST')
-    typesense_port = config('TYPESENSE_PORT')
-
-    vep_anno_file = config('VEP_ANNO_FILE')
-
-    batch_size = int(config("BATCH_SIZE"))
-
+def initialize_typesense(vep_anno_file, pheno_file, batch_size, api_key, typesense_host, typesense_port):
 
     client = typesense.Client({
         'api_key': api_key,
@@ -40,8 +30,6 @@ if __name__ == "__main__":
         ]
     }
 
-
-
     try:
         client.collections["autocomplete"].delete()
     except Exception:
@@ -50,9 +38,7 @@ if __name__ == "__main__":
     client.collections.create(schema_autocomplete)
 
     # Importing phenotypes
-    pheno_file = config('PHENO_FILE')
     pheno_dt = pd.read_csv(pheno_file)
-
 
     # Importing phenotypes
     for i, r in pheno_dt.iterrows():

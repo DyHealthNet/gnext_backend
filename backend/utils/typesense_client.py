@@ -5,7 +5,7 @@ import typesense
 import logging
 
 
-logger = logging.getLogger('api')
+logger = logging.getLogger('backend')
 
 client = typesense.Client(settings.TYPESENSE_CONFIG)
 
