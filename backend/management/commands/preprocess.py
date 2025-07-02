@@ -3,7 +3,6 @@ import sys
 import pandas as pd
 import traceback
 import logging
-import environ
 import os
 from django.core import management
 
@@ -20,6 +19,7 @@ class Command(BaseCommand):
            management.call_command("locuszoom")
            management.call_command("annotate")
            management.call_command("typesense")
+           #TODO: MAGMA input creation and execution
            logger.info("Finished preprocessing of GWAS summary statistics files!")
        except Exception as e:
            # print stack trace

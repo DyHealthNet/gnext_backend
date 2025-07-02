@@ -3,15 +3,12 @@ import sys
 import pandas as pd
 import traceback
 import logging
-import environ
+from decouple import config
 import os
-from backend.utils.preprocessing.normalize_GWAS_stats_files import normalize_gwas_stats_file
-from backend.utils.preprocessing.generate_manhattan_qq_files import generate_manhattan_qq_json
-import subprocess
+from backend.utils.preprocessing.zorp.zorp import sniffers
+from backend.utils.preprocessing.zorp.zorp import parsers
 
 logger = logging.getLogger("backend")
-
-environ.Env.read_env()
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
@@ -26,21 +23,9 @@ class Command(BaseCommand):
            sys.exit(1)
 
     @staticmethod
-    def preprocess_GWAS_stats_files():
-        GWAS_dir = env("GWAS_DIR")
-        pheno_file = env("PHENO_FILE")
-
-        chr_column = env("CHR_COLUMN")
-        pos_column = env("POS_COLUMN")
-        ref_column = env("REF_COLUMN")
-        alt_column = env("ALT_COLUMN")
-        pval_column = env("PVAL_COLUMN")
-        se_column = env("SE_COLUMN")
-        beta_column = env("BETA_COLUMN")
-        af_column = env("AF_COLUMN")
-        pval_neglog10 = env("PVAL_NEGLOG10")
-
-        genome_build = env("GENOME_BUILD")
+    def normalize_GWAS_stats_files():
+        GWAS_dir = config("GWAS_DIR")
+        pheno_file = config("PHENO_FILE")
 
         GWAS_norm_dir = os.path.join(GWAS_dir, "GWAS_stats_norm")
         os.makedirs(GWAS_norm_dir, exist_ok = True)
@@ -48,10 +33,28 @@ class Command(BaseCommand):
         # Importing phenotypes
         pheno_dt = pd.read_csv(pheno_file)
 
+        parser_options = {  # TODO: make these configurable
+            "chrom_col": int(config("CHR_COLUMN")),
+            "pos_col": int(config("POS_COLUMN")),
+            "ref_col": int(config("REF_COLUMN")),
+            "alt_col": int(config("ALT_COLUMN")),
+            "pval_col": int(config("PVAL_COLUMN")),
+            "is_neg_log_pvalue": True,
+            'beta': int(config("BETA_COLUMN")),
+            'stderr_beta': int(config("SE_COLUMN")),
+            'alt_allele_freq': int(config("AF_COLUMN")),
+            'rsid': None
+        }
+
         # Normalize GWAS files
         for i, r in pheno_dt.iterrows():
             in_filepath = os.path.join(GWAS_dir, r['filename'])
             # Normalize GWAS file
-            norm_filepath = os.path.join(GWAS_norm_dir, r['file_name'])
-            normalize_gwas_stats_file(in_filepath, norm_filepath)
+            norm_filepath = os.path.join(GWAS_norm_dir, r['filename'])
+            parser = parsers.GenericGwasLineParser(**parser_options)
+            reader = sniffers.guess_gwas_generic(in_filepath, parser=parser, skip_errors=True)
+            reader.write(norm_filepath, make_tabix=True)
+            logger.info("COMPLETED: Normalization of GWAS file: %s", norm_filepath)
+
+
 

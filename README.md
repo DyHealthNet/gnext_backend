@@ -1,4 +1,4 @@
-# Backend of the PheWeb Extension Platform
+# Backend of the DyHealthNetLight Platform
 
 # Conda Environment
 
@@ -16,9 +16,63 @@ Activate your conda environment
 conda activate pheweb_backend
 ```
 
+# Preprocessing Steps
+
+The preprocessing steps are necessary to prepare the data for the DyHealthNetLight backend.
+
+# Normalize GWAS Summary Statistics
+
+You can run this step by executing the management command `normalize`:
+```python
+python manage.py normalize
+```
+
+This creates the GWAS_stats_norm directory, which contains the normalized GWAS summary statistics.
+
+# Generate Manhattan and QQ Plots
+
+You can run this step by executing the management command `locuszoom`:
+```python
+python manage.py locuszoom
+```
+
+This creates the GWAS_manhattan and GWAS_qq directories, which contain the generated Manhattan and QQ JSON files.
+
+# VEP Annotation
+
+To generate a VCF file containing all variants and annotate the variants using VEP, we plan to have the management command `annotate`. 
+
+Since this command requires docker, we currently run this step manually. Once we implement our docker compose stack, this command will be available.
+
+Currently, you need to run the following steps manually:
+
+## Create a VCF file with all variants
+
+```bash
+mkdir GWAS_vep_directory
+backend/utils/preprocessing/bash/generate_full_variants_vcf.sh GWAS_norm_dir GWAS_vcf_file
+```
+
+## Setup VEP
+
+```bash
+backend/utils/preprocessing/bash/setup_vep.sh GWAS_vep_directory genome_build
+```
+
+## Annotate variants with VEP
+
+```bash
+backend/utils/preprocessing/bash/run_vep.sh GWAS_vcf_file GWAS_annotated_vcf_file GWAS_vcf_dir genome_build
+```
 
 
 # Typesense Initialization
+
+To initialize the typesense engine for the autocomplete functionality in the frontend, we plan to have the management command `typesense`. 
+
+Since this command requires docker, we currently run this step manually. Once we implement our docker compose stack, this command will be available.
+
+Currently, you need to run the following steps manually:
 
 First, pull the docker image:
 
@@ -29,52 +83,20 @@ docker pull typesense/typesense:29.0.rc15
 Then, create a volume:
 
 ```bash
-docker volume create pheweb_typesense_data
+docker volume create GWAS_typesense
 ```
 
 Finally, run the container:
 
 ```bash
- docker run -d --name typesense-server -p 8108:8108 -v pheweb_typesense_data:/data typesense/typesense:29.0.rc15 --data-dir /data --backend-key=xyz --enable-cors
+ docker run -d --name typesense-server -p 8108:8108 -v GWAS_typesense:/data typesense/typesense:29.0.rc15 --data-dir /data --backend-key=xyz --enable-cors
 ```
 
-Run the typesense_initialization.py script to fill the database with the initial data (currently: Pan_UKBB)
-```bash
-python typesense_initialization.py
+Now you can run the typesense management command to initialize the typesense engine:
+
+```python
+python manage.py typesense
 ```
-
-# Generation of VCF file with all variants
-
-For Pan_UKBB, the Bash script `make_variant_vcf.sh` (in `/nfs/data/Pan_UKBB/`) can be used to generate a VCF file with all variants.
-
-# Annotation of Variants with VEP
-
-Make a vep_data directory:
-```bash
-mkdir vep_data
-```
-
-Pull the docker image:
-```bash
-docker pull ensemblorg/ensembl-vep
-```
-
-Download the VEP cache:
-
-Ensure that Docker has access to your data directory.
-
-```bash
-docker run -t -i -v /nfs/data/Pan_UKBB/data:/data ensemblorg/ensembl-vep INSTALL.pl -a cf -s homo_sapiens -y GRCh37
-```
-
-Cache stored in --fasta /opt/vep/.vep/homo_sapiens/113_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz
-
-For the annotation, the Bash script `vep_run.sh` (in `/nfs/data/Pan_UKBB/`) can be used. This creates the `annotated_variants.vcf.bgz` file.
-
-
-# Generation of Manhattan and QQ JSON Files
-
-For this, the api/utils/locuszoom/reader.py file needs to be run. This creates new directories with files per GWAS summary statistic.
 
 # Run Django backend
 

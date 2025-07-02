@@ -1,29 +1,18 @@
 #!/bin/bash
 
-# Usage: ./run_vep.sh /absolute/path/to/input.vcf /absolute/path/to/output.vcf.bgz
+# Usage: ./run_vep.sh input.vcf output.vcf.bgz /absolute/path/to/vep_data genome_build
 
 set -euo pipefail
 
 INPUT_VCF="$1"
 OUTPUT_VCF="$2"
-GENOME_BUILD=$3
-
-if [[ -z "$INPUT_VCF" || ! -f "$INPUT_VCF" ]]; then
-  echo "Error: Input VCF '$INPUT_VCF' does not exist."
-  exit 1
-fi
-
-# Check parent directory of output file exists
-OUT_DIR=$(dirname "$OUTPUT_FILE")
-if [[ ! -d "$OUT_DIR" ]]; then
-  echo "Error: Output directory '$OUT_DIR' does not exist."
-  exit 1
-fi
+VEP_CACHE_DIR="$3"
+GENOME_BUILD=$4
 
 echo "Starting VEP run at $(date)"
 
 docker run \
-  -v /nfs/data/Pan_UKBB/data:/data \
+  -v "$VEP_CACHE_DIR":/data \
   ensemblorg/ensembl-vep \
   vep \
     --input_file "$INPUT_VCF" \

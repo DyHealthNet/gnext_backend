@@ -15,8 +15,7 @@ import heapq
 import logging
 import math
 
-from zorp.parsers import BasicVariant
-
+from backend.utils.preprocessing.zorp.zorp.parsers import BasicVariant
 
 logger = logging.getLogger(__name__)
 

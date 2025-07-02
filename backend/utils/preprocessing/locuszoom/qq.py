@@ -27,7 +27,8 @@ import typing as ty
 import boltons.iterutils
 import boltons.mathutils
 import scipy.stats
-from zorp.parsers import BasicVariant
+from backend.utils.preprocessing.zorp.zorp.parsers import BasicVariant
+
 
 
 NUM_BINS = 400

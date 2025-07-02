@@ -37,7 +37,7 @@ for f in "$DATA_DIR"/*.gz; do
 
   echo "Extracting variants from $PHENO..."
 
-  zcat "$f" | awk -v pheno="$PHENO" -F'\t' '
+  gzcat "$f" | awk -v pheno="$PHENO" -F'\t' '
     BEGIN {OFS="\t"}
     NR==1 {
       for (i=1; i<=NF; i++) {
