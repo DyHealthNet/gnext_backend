@@ -9,6 +9,7 @@ from backend.utils.preprocessing.locuszoom import manhattan, qq
 import math
 import json
 from backend.utils.preprocessing.zorp.zorp import sniffers
+from django.conf import settings
 
 
 logger = logging.getLogger("backend")
@@ -30,13 +31,10 @@ class Command(BaseCommand):
         GWAS_dir = config("GWAS_DIR")
         pheno_file = config("PHENO_FILE")
 
-        GWAS_norm_dir = os.path.join(GWAS_dir, "GWAS_stats_norm")
-        os.makedirs(GWAS_norm_dir, exist_ok = True)
-
-        GWAS_manhattan_dir = os.path.join(GWAS_dir, "GWAS_manhattan")
+        GWAS_norm_dir = settings.GWAS_NORM_DIR
+        GWAS_manhattan_dir = settings.GWAS_MANHATTAN_DIR
         os.makedirs(GWAS_manhattan_dir, exist_ok=True)
-
-        GWAS_qq_dir = os.path.join(GWAS_dir, "GWAS_qq")
+        GWAS_qq_dir = settings.GWAS_QQ_DIR
         os.makedirs(GWAS_qq_dir, exist_ok=True)
 
         # Importing phenotypes

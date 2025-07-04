@@ -89,7 +89,7 @@ docker volume create GWAS_typesense
 Finally, run the container:
 
 ```bash
- docker run -d --name typesense-server -p 8108:8108 -v GWAS_typesense:/data typesense/typesense:29.0.rc15 --data-dir /data --backend-key=xyz --enable-cors
+ docker run -d --name typesense-server -p 8108:8108 -v GWAS_typesense:/data typesense/typesense:29.0.rc15 --data-dir /data --backend --api-key=xyz --enable-cors
 ```
 
 Now you can run the typesense management command to initialize the typesense engine:

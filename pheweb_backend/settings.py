@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 from decouple import config
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -146,6 +147,16 @@ TYPESENSE_CONFIG = {
     "api_key": config("TYPESENSE_KEY"),
     "connection_timeout_seconds": 2
 }
+
+# Configuration parameters
+GWAS_DIR = config("GWAS_DIR")
+GWAS_NORM_DIR = os.path.join(GWAS_DIR, "GWAS_stats_norm")
+GWAS_MANHATTAN_DIR = os.path.join(GWAS_DIR, "GWAS_manhattan")
+GWAS_QQ_DIR = os.path.join(GWAS_DIR, "GWAS_qq")
+GWAS_VEP_DIR = os.path.join(GWAS_DIR, "GWAS_vep")
+GWAS_VCF_FILE = "full_variants.vcf"
+GWAS_ANNO_VCF_FILE = "annotated_full_variants.vcf.bgz"
+
 
 LOGGING = {
     'version': 1,

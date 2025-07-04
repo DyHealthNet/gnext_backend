@@ -7,6 +7,7 @@ from decouple import config
 import os
 from backend.utils.preprocessing.zorp.zorp import sniffers
 from backend.utils.preprocessing.zorp.zorp import parsers
+from django.conf import settings
 
 logger = logging.getLogger("backend")
 
@@ -27,13 +28,13 @@ class Command(BaseCommand):
         GWAS_dir = config("GWAS_DIR")
         pheno_file = config("PHENO_FILE")
 
-        GWAS_norm_dir = os.path.join(GWAS_dir, "GWAS_stats_norm")
+        GWAS_norm_dir = settings.GWAS_NORM_DIR
         os.makedirs(GWAS_norm_dir, exist_ok = True)
 
         # Importing phenotypes
         pheno_dt = pd.read_csv(pheno_file)
 
-        parser_options = {  # TODO: make these configurable
+        parser_options = {
             "chrom_col": int(config("CHR_COLUMN")),
             "pos_col": int(config("POS_COLUMN")),
             "ref_col": int(config("REF_COLUMN")),

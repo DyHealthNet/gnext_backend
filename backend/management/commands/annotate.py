@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 from decouple import config
+from django.conf import settings
 
 logger = logging.getLogger("backend")
 
@@ -22,20 +23,21 @@ class Command(BaseCommand):
 
     @staticmethod
     def annotate_variants():
-        GWAS_dir = config("GWAS_DIR")
         genome_build = config("GENOME_BUILD")
 
-        GWAS_norm_dir = os.path.join(GWAS_dir, "GWAS_stats_norm")
-
-        GWAS_vep_dir = os.path.join(GWAS_dir, "GWAS_vep")
+        GWAS_norm_dir = settings.GWAS_NORM_DIR
+        GWAS_vep_dir = settings.GWAS_VEP_DIR
         os.makedirs(GWAS_vep_dir, exist_ok=True)
-        GWAS_vcf_file = os.path.join(GWAS_vep_dir, "full_variants.vcf")
+        GWAS_vcf_file = settings.GWAS_VCF_FILE
+        GWAS_annotated_vcf_file = settings.GWAS_ANNO_VCF_FILE
+
+        # TODO: window_up and window_down should be used from env
 
         # Generate full VCF file TODO: check how to do this in Docker -> because docker pull and docker run executed
-        subprocess.run(["bash", "backend/utils/preprocessing/bash/generate_full_variants_vcf.sh", GWAS_norm_dir, GWAS_vcf_file])
+        subprocess.run(["bash", "backend/utils/preprocessing/bash/generate_full_variants_vcf.sh", GWAS_norm_dir, os.path.join(GWAS_vep_dir, GWAS_vcf_file)])
 
         # Download VEP docker image and install cache TODO: check how to do this in Docker -> because docker pull and docker run executed
         subprocess.run(["bash", "backend/utils/preprocessing/bash/setup_vep.sh", GWAS_vep_dir, genome_build])
 
         # Run VEP annotation TODO: needs to be changed when backend in Docker -> because docker run executed
-        subprocess.run(["bash", "../../utils/preprocessing/bash/run_vep.sh", "full_variants.vcf", "annotated_full_variants.vcf.bgz", GWAS_vep_dir,genome_build])
+        subprocess.run(["bash", "../../utils/preprocessing/bash/run_vep.sh", GWAS_vcf_file, GWAS_annotated_vcf_file, GWAS_vep_dir, genome_build])

@@ -8,7 +8,7 @@ import os
 import typesense
 import gzip
 import json
-
+from django.conf import settings
 
 logger = logging.getLogger("backend")
 
@@ -24,10 +24,8 @@ class Command(BaseCommand):
            batch_size = int(config("BATCH_SIZE"))
            pheno_file = config('PHENO_FILE')
 
-           GWAS_dir = config("GWAS_DIR")
-           GWAS_vcf_dir = os.path.join(GWAS_dir, "GWAS_vcf")
-           os.makedirs(GWAS_vcf_dir, exist_ok=True)
-           GWAS_annotated_vcf_file = os.path.join(GWAS_vcf_dir, "annotated_full_variants.vcf.bgz")
+
+           GWAS_annotated_vcf_file = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
 
            # Initialize the typesense client
            logger.info("Starting typesense initialization.")
@@ -78,7 +76,7 @@ class Command(BaseCommand):
 
         # Importing phenotypes
         for i, r in pheno_dt.iterrows():
-            logger.info("Importing phenotype to typesense: ", r['phenocode'])
+            logger.info(f"Importing phenotype to typesense: {r['phenocode']}")
 
             # Add phenotype to schema
             doc = {
@@ -122,7 +120,7 @@ class Command(BaseCommand):
                 if len(documents) % batch_size == 0:
                     payload = '\n'.join(json.dumps(doc) for doc in documents)
                     client.collections["autocomplete"].documents.import_(payload, {'action': 'upsert'})
-                    logger.info("Batch Nr. ", batch_nr, " imported to typesense!")
+                    logger.info(f"Batch Nr. {batch_nr} imported to typesense!")
                     documents = []
                     batch_nr += 1
 
@@ -130,6 +128,6 @@ class Command(BaseCommand):
             if documents:
                 payload = '\n'.join(json.dumps(doc) for doc in documents)
                 client.collections["autocomplete"].documents.import_(payload, {'action': 'upsert'})
-                logger.info("Batch Nr. ", batch_nr, " imported to typesense!")
+                logger.info(f"Batch Nr. {batch_nr} imported to typesense!")
                 documents = []
                 batch_nr += 1
