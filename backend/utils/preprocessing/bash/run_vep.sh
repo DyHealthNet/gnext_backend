@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Usage: ./run_vep.sh input.vcf output.vcf.bgz /absolute/path/to/vep_data genome_build
+# Usage: ./run_vep.sh input.vcf output.vcf.bgz /absolute/path/to/vep_data genome_build window_up window_down
 
 set -euo pipefail
 
@@ -8,6 +8,8 @@ INPUT_VCF="$1"
 OUTPUT_VCF="$2"
 VEP_CACHE_DIR="$3"
 GENOME_BUILD=$4
+WINDOW_UP=$5
+WINDOW_DOWN=$6
 
 echo "Starting VEP run at $(date)"
 
@@ -24,7 +26,8 @@ docker run \
     --everything \
     --vcf \
     --species homo_sapiens \
-    --assembly "$GENOME_BUILD"
+    --assembly "$GENOME_BUILD" \
+    --distance "$WINDOW_UP","$WINDOW_DOWN"
 
 echo "VEP completed at $(date)"
 

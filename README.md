@@ -106,4 +106,39 @@ After all preprocessing steps have been completed and the typesense docker conta
 python manage.py runserver 0.0.0.0:5136
 ```
 
-Attention: the port needs to be the same than specified in the .env and remember to forward the ports.
+Attention: the port needs to be the same as specified in the .env and remember to forward the ports.
+
+# MAGMA Execution
+
+## Download MAGMA
+
+You can download the MAGMA software from the official website: https://ctg.cncr.nl/software/MAGMA
+
+Make a directory called magma, download the zip and unzip it:
+
+```bash
+mkdir magma
+cd magma
+wget -O magma.zip https://vu.data.surfsara.nl/index.php/s/zkKbNeNOZAhFXZB/download
+unzip magma.zip
+```
+
+Specify the location of the MAGMA executable in the .env file!
+
+## Download Reference Data
+
+You can download the reference data from the official website: https://ctg.cncr.nl/software/MAGMA#reference_data
+
+Make a directory called magma_reference_data, download the zip and unzip it:
+
+```bash
+mkdir g1000_eur
+cd g1000_eur
+unzip g1000_eur.zip 
+```
+
+Specify the location of the LD reference data in the .env file!
+
+## Run MAGMA
+
+TODO
