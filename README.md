@@ -106,7 +106,7 @@ After all preprocessing steps have been completed and the typesense docker conta
 python manage.py runserver 0.0.0.0:5136
 ```
 
-Attention: the port needs to be the same than specified in the .env and remember to forward the ports.
+Attention: the port needs to be the same as specified in the .env and remember to forward the ports.
 
 # MAGMA Execution
 

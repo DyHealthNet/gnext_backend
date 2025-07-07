@@ -46,8 +46,11 @@ class Command(BaseCommand):
                 missing.append(key)
                 continue
 
-            if key in file_checks and not os.path.exists(value):
-                raise CommandError(f"{key} is set but path does not exist: {value}")
+            if key in file_checks:
+                if file_checks[key] == "file" and not os.path.isfile(value):
+                    raise CommandError(f"{key} is set but the file does not exist: {value}")
+                if file_checks[key] == "directory" and not os.path.isdir(value):
+                    raise CommandError(f"{key} is set but the directory does not exist: {value}")
 
             if key in ["CHR_COLUMN", "POS_COLUMN", "REF_COLUMN", "ALT_COLUMN",
                        "PVAL_COLUMN", "SE_COLUMN", "BETA_COLUMN", "AF_COLUMN",
