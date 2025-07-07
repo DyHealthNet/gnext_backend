@@ -41,7 +41,7 @@ class Command(BaseCommand):
         for key in required_keys:
             try:
                 value = config(key)
-            except Exception:
+            except UndefinedValueError:
                 missing.append(key)
                 continue
 
