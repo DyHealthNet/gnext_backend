@@ -1,5 +1,4 @@
 from django.core.management.base import BaseCommand
-import traceback
 import logging
 from decouple import config
 import os
