@@ -1,14 +1,6 @@
 #Extracted from locuszoom-hosted: d726fb2
-from api.utils.zorp.zorp import parsers, sniffers, readers, lookups
-import json
-import math
-import api.utils.locuszoom.manhattan as manhattan
-import api.utils.locuszoom.qq as qq
-from genelocator import get_genelocator
-import genelocator.exception as gene_exc
-import pysam
-import pandas as pd
-import re
+from backend.utils.preprocessing.zorp.zorp import parsers, sniffers, readers, lookups
+
 import lmdb
 import msgpack
 import struct
@@ -118,5 +110,5 @@ def normalize_contents_lib(reader, output_path, genome_build='GRCh37', debug_mod
             out_f.write(f"{rs_id}\t{pval}\n")
             count_out += 1
 
-        logger.debug(f"Skiped {count_in} rows, wrote {count_out} normalized rows")
+        logger.debug(f"Skiped {count_skip} rows, wrote {count_out} normalized rows")
     return True

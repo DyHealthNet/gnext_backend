@@ -11,6 +11,7 @@ from collections import defaultdict
 import pandas as pd
 from backend.utils.preprocessing.zorp.zorp import parsers, sniffers
 import backend.utils.preprocessing.magma.magma_norm_exec as magma_exec
+from django.conf import settings
 
 logger = logging.getLogger("backend")
 
@@ -18,8 +19,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
            logger.info("Starting MAGMA execution of GWAS summary statistics files.")
-           self.prepare_MAGMA_input()
-           self.normalze_MAGMA_input()
+           self.prepare_MAGMA_mapping_input()
+           self.prepare_MAGMA_GWAS_input()
            self.run_MAGMA()
            logger.info("Finished MAGMA execution of GWAS summary statistics files!")
        except Exception as e:
@@ -42,15 +43,13 @@ class Command(BaseCommand):
                     return parts
         raise ValueError("No CSQ format found.")
 
-    def prepare_MAGMA_input(self):
-        GWAS_dir = config("GWAS_DIR")
+    def prepare_MAGMA_mapping_input(self):
 
-        GWAS_vep_dir = os.path.join(GWAS_dir, "GWAS_vep")
-        GWAS_annotated_vcf_file = os.path.join(GWAS_vep_dir, "annotated_variants.vcf.bgz") # annotated_full_variants
+        GWAS_annotated_vcf_file = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
 
-        GWAS_magma_dir = os.path.join(GWAS_dir, "GWAS_magma")
+        GWAS_magma_dir = settings.GWAS_MAGMA_DIR
         os.makedirs(GWAS_magma_dir, exist_ok=True)
-        GWAS_magma_gene_annot_file = os.path.join(GWAS_magma_dir, "magma.genes.annot")
+        GWAS_anno_magma_file = os.path.join(GWAS_magma_dir, settings.GWAS_ANNO_MAGMA_FILE)
 
         without_gene_terms = ["regulatory_region_variant", "TF_binding_site_variant", "intergenic_variant",
                               "intron_variant"]
@@ -100,15 +99,16 @@ class Command(BaseCommand):
                     logger.info(f"Processed {i} lines from VCF file.")
 
         # Write MAGMA gene annotation file
-        with open(GWAS_magma_gene_annot_file, 'w') as f:
+        with open(GWAS_anno_magma_file, 'w') as f:
             f.write("# window_up = " + str(window_size_up) + "\n")
             f.write("# window_down = " + str(window_size_down) + "\n")
             for gene, rsids in gene_to_rsids.items():
                 f.write(f"{gene}\t1:1:2\t{' '.join(rsids)}\n")
 
-    def normalze_MAGMA_input(self):
+    def prepare_MAGMA_GWAS_input(self):
         dir_path = config('GWAS_DIR')
-        vep_path = config('VEP_ANNO_FILE')
+
+        GWAS_annotated_vcf_file = settings.GWAS_ANNO_VCF_FILE
         pheno_file = config('PHENO_FILE')
         pheno_dt = pd.read_csv(pheno_file)
 
@@ -135,7 +135,7 @@ class Command(BaseCommand):
         if not os.path.isdir(lmdb_path) or not os.path.exists(os.path.join(lmdb_path, "data.mdb")):
             logger.info("LMDB not found, creating...")
             start_time = time.time()
-            magma_exec.build_snp_map_lmdb_from_vcf(vep_path, lmdb_path, map_size=10 * 1024 ** 3)
+            magma_exec.build_snp_map_lmdb_from_vcf(GWAS_annotated_vcf_file, lmdb_path, map_size=10 * 1024 ** 3)
             end_time = time.time()
             logger.debug(f"Time taken to produce LMDB mapping lib: {end_time - start_time:.2f} seconds")
         else:

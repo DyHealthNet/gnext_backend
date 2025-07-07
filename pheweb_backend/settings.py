@@ -156,6 +156,8 @@ GWAS_QQ_DIR = os.path.join(GWAS_DIR, "GWAS_qq")
 GWAS_VEP_DIR = os.path.join(GWAS_DIR, "GWAS_vep")
 GWAS_VCF_FILE = "full_variants.vcf"
 GWAS_ANNO_VCF_FILE = "annotated_full_variants.vcf.bgz"
+GWAS_MAGMA_DIR = os.path.join(GWAS_DIR, "GWAS_magma")
+GWAS_ANNO_MAGMA_FILE = "magma.genes.annot"
 
 
 LOGGING = {
