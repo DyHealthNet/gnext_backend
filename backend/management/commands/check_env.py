@@ -4,24 +4,13 @@ import traceback
 import logging
 from decouple import config
 import os
+from django.core.management import CommandError
 
 logger = logging.getLogger("backend")
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        try:
-            self.check_env_variables()
-        except Exception as e:
-            traceback.print_exc()
-            logger.error(f"Environment file check failed: {e}")
-            sys.exit(1)
-
-    @staticmethod
-    def check_env_variables():
-        """
-        Check presence and basic validity of required environment variables using decouple.config.
-        """
         required_keys = [
             "TYPESENSE_KEY",
             "TYPESENSE_HOST",
@@ -59,8 +48,7 @@ class Command(BaseCommand):
                 continue
 
             if key in file_checks and not os.path.exists(value):
-                logger.error(f"{key} is set but path does not exist: {value}")
-                sys.exit(1)
+                raise CommandError(f"{key} is set but path does not exist: {value}")
 
             if key in ["CHR_COLUMN", "POS_COLUMN", "REF_COLUMN", "ALT_COLUMN",
                        "PVAL_COLUMN", "SE_COLUMN", "BETA_COLUMN", "AF_COLUMN",
@@ -68,11 +56,13 @@ class Command(BaseCommand):
                 try:
                     int(value)
                 except ValueError:
-                    logger.error(f"{key} should be an integer but got: {value}")
-                    sys.exit(1)
+                    raise CommandError(f"{key} should be an integer but got: {value}")
+
+            if key == "GENOME_BUILD":
+                if value not in ["GRCh37", "GRCh38"]:
+                    raise CommandError(f"Invalid genome build: {value}. Expected 'GRCh37' or 'GRCh38'.")
 
         if missing:
-            logger.error(f"Missing environment variables: {', '.join(missing)}")
-            sys.exit(1)
+            raise CommandError(f"Missing environment variables: {', '.join(missing)}")
         else:
             logger.info("All required environment variables are present.")
