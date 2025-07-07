@@ -106,7 +106,7 @@ class Command(BaseCommand):
                 f.write(f"{gene}\t1:1:2\t{' '.join(rsids)}\n")
 
     def prepare_MAGMA_GWAS_input(self):
-        dir_path = config('GWAS_DIR')
+        dir_path = settings.GWAS_DIR
 
         GWAS_annotated_vcf_file = settings.GWAS_ANNO_VCF_FILE
         pheno_file = config('PHENO_FILE')
@@ -127,10 +127,10 @@ class Command(BaseCommand):
 
         parser = parsers.GenericGwasLineParser(**parser_options)
 
-        os.makedirs(dir_path + "GWAS_stats_norm/", exist_ok=True)
-        os.makedirs(dir_path + "GWAS_magma/", exist_ok=True)
+        os.makedirs(settings.GWAS_NORM_DIR, exist_ok=True)
+        os.makedirs(settings.GWAS_MAGMA_DIR, exist_ok=True)
 
-        lmdb_path = dir_path + "/GWAS_magma/" + "lmdb_" + config('VITE_GENOME_BUILD')
+        lmdb_path = settings.GWAS_MAGMA_DIR + "/lmdb_" + config('VITE_GENOME_BUILD')
         # Only build the LMDB if it doesn't exist or is missing required files
         if not os.path.isdir(lmdb_path) or not os.path.exists(os.path.join(lmdb_path, "data.mdb")):
             logger.info("LMDB not found, creating...")
@@ -147,7 +147,7 @@ class Command(BaseCommand):
             logger.debug(f"Importing phenotype: {r['phenocode']}")
             GWAS_file = r['filename']
             sample_file = dir_path + GWAS_file
-            norm_gwas_file = dir_path + "/GWAS_magma/GWAS_stats_norm/" + GWAS_file.replace(".tsv.bgz", ".txt")
+            norm_gwas_file = os.path.join(settings.GWAS_NORM_DIR, GWAS_file.replace(".tsv.bgz", ".txt"))
             if not os.path.exists(norm_gwas_file):
 
                 reader = sniffers.guess_gwas_generic(sample_file, parser=parser, skip_errors=True)
@@ -164,8 +164,8 @@ class Command(BaseCommand):
 
     def run_MAGMA(self):
         magma = config('MAGMA_EXEC')
-        dir_path = config('GWAS_DIR')
-        gene_annot = os.path.join(dir_path, "GWAS_magma/magma.genes.annot")
+        dir_path = settings.GWAS_DIR
+        gene_annot = os.path.join(settings.GWAS_MAGMA_DIR, settings.GWAS_ANNO_MAGMA_FILE)
         LD_path = config('MAGMA_LD_REF')
         pheno_file = config('PHENO_FILE')
         pheno_dt = pd.read_csv(pheno_file)
@@ -173,8 +173,8 @@ class Command(BaseCommand):
         n_samples = config('N_SAMPLES')
         for i, r in pheno_dt.iterrows():
             gwas_file = r['filename']
-            sample_file = dir_path  + "/GWAS_magma/GWAS_stats_norm/" + gwas_file.replace(".tsv.bgz", ".txt")
-            magma_file = dir_path + "/GWAS_magma/MAGMA_results/" + gwas_file.replace(".tsv.bgz", "")
+            sample_file = os.path.join(settings.GWAS_NORM_DIR, gwas_file.replace(".tsv.bgz", ".txt"))
+            magma_file = os.path.join(settings.GWAS_MAGMA_RESULT_DIR, gwas_file.replace(".tsv.bgz", ""))
 
             if not os.path.exists(magma_file):
 
