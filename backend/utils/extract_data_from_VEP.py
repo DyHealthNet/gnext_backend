@@ -5,7 +5,6 @@ import gzip
 import logging
 import pandas as pd
 
-
 from backend.utils.VEP_consequences import VEP_RANK_DICT
 
 logger = logging.getLogger('backend')
