@@ -54,7 +54,8 @@ class Command(BaseCommand):
             norm_filepath = os.path.join(GWAS_norm_dir, r['filename'])
             parser = parsers.GenericGwasLineParser(**parser_options)
             reader = sniffers.guess_gwas_generic(in_filepath, parser=parser, skip_errors=True)
-            reader.write(norm_filepath, make_tabix=True)
+            columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta', 'alt_allele_freq']
+            reader.write(norm_filepath, make_tabix=True, columns=columns)
             logger.info("COMPLETED: Normalization of GWAS file: %s", norm_filepath)
 
 
