@@ -17,6 +17,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
 
+           # TODO: Lisi -> remove initialization to setup
+
            # Config variables
            api_key = config('TYPESENSE_KEY')
            typesense_host = config('TYPESENSE_HOST')

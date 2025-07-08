@@ -42,7 +42,11 @@ class Command(BaseCommand):
 
         # Normalize GWAS files
         for i, r in pheno_dt.iterrows():
+
+            # TODO: Bastienne -> add rsID to norm files -> override files
+
             # Generate Manhattan and QQ JSON file
+            # TODO: Lisi -> check if json files include rsIDs
             manhattan_filepath = os.path.join(GWAS_manhattan_dir, r['filename'].split(".")[0] + "_manhattan.json")
             qq_filepath = os.path.join(GWAS_qq_dir, r['filename'].split(".")[0] + "_qq.json")
             norm_filepath = os.path.join(GWAS_norm_dir, r['filename'] + ".gz")
@@ -56,6 +60,8 @@ class Command(BaseCommand):
             logger.info("COMPLETED: Manhattan JSON file generation of GWAS file: %s", norm_filepath)
             Command.generate_qq(reader_for_qq, qq_filepath)
             logger.info("COMPLETED: QQ JSON file generation of GWAS file: %s", norm_filepath)
+
+            # TODO: Bastienne -> add MAGMA input generation here
 
     @staticmethod
     def generate_manhattan(reader, out_filename: str) -> bool:

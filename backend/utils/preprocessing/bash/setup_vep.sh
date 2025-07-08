@@ -11,6 +11,9 @@ mkdir -p "$VEP_CACHE_DIR"
 echo "Pulling VEP Docker image..."
 docker pull ensemblorg/ensembl-vep
 
+echo "Fix permissions"
+chmod -R 777 "$VEP_CACHE_DIR"
+
 echo "Running INSTALL.pl to download VEP cache..."
 docker run -t -i \
   -v "$VEP_CACHE_DIR":/opt/vep/.vep \

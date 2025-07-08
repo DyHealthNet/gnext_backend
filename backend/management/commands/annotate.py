@@ -12,15 +12,9 @@ logger = logging.getLogger("backend")
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-       try:
-           logger.info("Starting annotation of GWAS summary statistics files.")
-           self.annotate_variants()
-           logger.info("Finished annotation of GWAS summary statistics files!")
-       except Exception as e:
-           # print stack trace
-           traceback.print_exc()
-           logger.error(f"Annotation with VEP failed: {e}")
-           sys.exit(1)
+       logger.info("Starting annotation of GWAS summary statistics files.")
+       self.annotate_variants()
+       logger.info("Finished annotation of GWAS summary statistics files!")
 
     @staticmethod
     def annotate_variants():
@@ -40,6 +34,7 @@ class Command(BaseCommand):
         except subprocess.CalledProcessError as e:
             raise CommandError(f"Failed to generate full VCF file: {e}")
 
+        # TODO: Lisi -> remove initialization to setup
         # Download VEP docker image and install cache TODO: check how to do this in Docker -> because docker pull and docker run executed
         try:
             subprocess.run(["bash", "backend/utils/preprocessing/bash/setup_vep.sh", GWAS_vep_dir, genome_build], check = True)
