@@ -12,6 +12,8 @@ import pandas as pd
 from backend.utils.preprocessing.zorp.zorp import parsers, sniffers
 import backend.utils.preprocessing.magma.magma_norm_exec as magma_exec
 from django.conf import settings
+import urllib.request
+import zipfile
 
 logger = logging.getLogger("backend")
 
@@ -19,8 +21,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
            logger.info("Starting MAGMA execution of GWAS summary statistics files.")
-           self.prepare_MAGMA_mapping_input()
-           self.prepare_MAGMA_GWAS_input()
+           #self.prepare_MAGMA_mapping_input()
+           #self.prepare_MAGMA_GWAS_input()
            self.run_MAGMA()
            logger.info("Finished MAGMA execution of GWAS summary statistics files!")
        except Exception as e:
@@ -28,6 +30,59 @@ class Command(BaseCommand):
            traceback.print_exc()
            logger.error(f"MAGMA run with VEP failed: {e}")
            sys.exit(1)
+
+    def get_MAGMA_exec(self):
+        magma_path = config('MAGMA_EXEC')
+
+        # Check if the executable exists and is runnable
+        if os.path.isfile(magma_path) and os.access(magma_path, os.X_OK):
+            logger.info("Magma executable exists and is runnable: %s", magma_path)
+            return magma_path
+
+        download_dir = os.path.join(settings.GWAS_MAGMA_DIR, "magma")
+        if os.path.isfile(os.path.join(download_dir, "magma")) and os.access(os.path.join(download_dir, "magma"), os.X_OK):
+            logger.info("Magma executable exists and is runnable: %s", os.path.join(download_dir, "magma"))
+            return os.path.join(download_dir, "magma")
+
+        logger.info("MAGMA executable not found, downloading MAGMA...")
+        os.makedirs(download_dir, exist_ok=True)
+
+        zip_path = os.path.join(download_dir, "magma.zip")
+        url = "https://vu.data.surfsara.nl/index.php/s/lxDgt2dNdNr6DYt/download"
+
+        try:
+            urllib.request.urlretrieve(url, zip_path)
+            logger.debug(f"Downloaded MAGMA zip to: {zip_path}")
+        except Exception as e:
+            logger.error(f"Failed to download MAGMA: {e}")
+            return None
+
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(download_dir)
+            logger.debug(f"Extracted MAGMA to: {download_dir}")
+        except zipfile.BadZipFile as e:
+            logger.error(f"Failed to extract MAGMA zip: {e}")
+            return None
+
+        # Get the executable
+        magma_exe = None
+        for root, _, files in os.walk(download_dir):
+            for file in files:
+                if file == "magma":
+                    path = os.path.join(root, file)
+                    os.chmod(path, 0o755)  # Ensure it's executable
+                    magma_exe = path
+                    break
+            if magma_exe:
+                break
+
+        if magma_exe:
+            logger.info(f"Magma executable ready at: {magma_exe}")
+            return magma_exe
+        else:
+            logger.error("Magma executable not found after extraction.")
+            return None
 
 
     def extract_csq_fields(self, vcf_path):
@@ -106,7 +161,7 @@ class Command(BaseCommand):
                 f.write(f"{gene}\t1:1:2\t{' '.join(rsids)}\n")
 
     def prepare_MAGMA_GWAS_input(self):
-        dir_path = config('GWAS_DIR')
+        dir_path = settings.GWAS_DIR
 
         GWAS_annotated_vcf_file = settings.GWAS_ANNO_VCF_FILE
         pheno_file = config('PHENO_FILE')
@@ -127,10 +182,10 @@ class Command(BaseCommand):
 
         parser = parsers.GenericGwasLineParser(**parser_options)
 
-        os.makedirs(dir_path + "GWAS_stats_norm/", exist_ok=True)
-        os.makedirs(dir_path + "GWAS_magma/", exist_ok=True)
+        os.makedirs(settings.GWAS_NORM_DIR, exist_ok=True)
+        os.makedirs(settings.GWAS_MAGMA_DIR, exist_ok=True)
 
-        lmdb_path = dir_path + "/GWAS_magma/" + "lmdb_" + config('VITE_GENOME_BUILD')
+        lmdb_path = settings.GWAS_MAGMA_DIR + "/lmdb_" + config('VITE_GENOME_BUILD')
         # Only build the LMDB if it doesn't exist or is missing required files
         if not os.path.isdir(lmdb_path) or not os.path.exists(os.path.join(lmdb_path, "data.mdb")):
             logger.info("LMDB not found, creating...")
@@ -147,7 +202,7 @@ class Command(BaseCommand):
             logger.debug(f"Importing phenotype: {r['phenocode']}")
             GWAS_file = r['filename']
             sample_file = dir_path + GWAS_file
-            norm_gwas_file = dir_path + "/GWAS_magma/GWAS_stats_norm/" + GWAS_file.replace(".tsv.bgz", ".txt")
+            norm_gwas_file = os.path.join(settings.GWAS_NORM_DIR, GWAS_file.replace(".tsv.bgz", ".txt"))
             if not os.path.exists(norm_gwas_file):
 
                 reader = sniffers.guess_gwas_generic(sample_file, parser=parser, skip_errors=True)
@@ -163,18 +218,18 @@ class Command(BaseCommand):
                 logger.debug(f"Normalized GWAS stats file already present: {GWAS_file}")
 
     def run_MAGMA(self):
-        magma = config('MAGMA_EXEC')
-        dir_path = config('GWAS_DIR')
-        gene_annot = os.path.join(dir_path, "GWAS_magma/magma.genes.annot")
-        LD_path = config('MAGMA_LD_REF')
+        magma = self.get_MAGMA_exec()
+        logger.debug(f"The path to the magma executable is {magma}")
+        gene_annot = os.path.join(settings.GWAS_MAGMA_DIR, settings.GWAS_ANNO_MAGMA_FILE)
+        LD_path = config('MAGMA_LD_REF_DIR')
         pheno_file = config('PHENO_FILE')
         pheno_dt = pd.read_csv(pheno_file)
 
         n_samples = config('N_SAMPLES')
         for i, r in pheno_dt.iterrows():
             gwas_file = r['filename']
-            sample_file = dir_path  + "/GWAS_magma/GWAS_stats_norm/" + gwas_file.replace(".tsv.bgz", ".txt")
-            magma_file = dir_path + "/GWAS_magma/MAGMA_results/" + gwas_file.replace(".tsv.bgz", "")
+            sample_file = os.path.join(settings.GWAS_NORM_DIR, gwas_file.replace(".tsv.bgz", ".txt"))
+            magma_file = os.path.join(settings.GWAS_MAGMA_RESULT_DIR, gwas_file.replace(".tsv.bgz", ""))
 
             if not os.path.exists(magma_file):
 

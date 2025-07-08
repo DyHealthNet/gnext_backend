@@ -77,7 +77,7 @@ def normalize_contents_lib(reader, output_path, genome_build='GRCh37', debug_mod
     In "debug mode", the ingest process will use a smaller (test environment optimized) version of the
         rsid_finder lookup.
     """
-    build = lmdb_path if lmdb_path else genome_build
+    build = lmdb_path + "/data.mdb" if lmdb_path else genome_build
     rsid_finder = lookups.SnpToRsid(build, test=debug_mode)
     reader.add_lookup('rsid', lambda variant: rsid_finder(variant.chrom, variant.pos, variant.ref, variant.alt))
     # either this
