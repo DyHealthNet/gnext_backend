@@ -112,7 +112,7 @@ Attention: the port needs to be the same as specified in the .env and remember t
 
 ## Download MAGMA
 
-Magma gets downloaded automatically. If, however, the download fails or is outdated, it is also possible to download it yourself and specified the path to the executable in the .env.
+Magma gets downloaded automatically. If, however, the download fails or is outdated, it is also possible to download it yourself and specify the path to the executable in the .env.
 
 You can download the MAGMA software from the official website: https://ctg.cncr.nl/software/MAGMA
 
