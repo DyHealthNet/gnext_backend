@@ -16,11 +16,21 @@ Activate your conda environment
 conda activate pheweb_backend
 ```
 
+
+# Setup 
+
+You can run the setup by executing the management command `setup`:
+```python
+python manage.py setup
+```
+
+This will check if VEP, Typesense and MAGMA are ready for being used. If not, it will make sure that the necessary directories are created and the required files are downloaded.
+
 # Preprocessing Steps
 
 The preprocessing steps are necessary to prepare the data for the DyHealthNetLight backend.
 
-# Normalize GWAS Summary Statistics
+## Normalize GWAS Summary Statistics
 
 You can run this step by executing the management command `normalize`:
 ```python
@@ -29,88 +39,38 @@ python manage.py normalize
 
 This creates the GWAS_stats_norm directory, which contains the normalized GWAS summary statistics.
 
-# Generate Manhattan and QQ Plots
+## Generate Input Data: Manhattan, QQ, MAGMA files
 
-You can run this step by executing the management command `locuszoom`:
+You can run this step by executing the management command `input`:
 ```python
-python manage.py locuszoom
+python manage.py input
 ```
 
 This creates the GWAS_manhattan and GWAS_qq directories, which contain the generated Manhattan and QQ JSON files.
 
-# VEP Annotation
+## VEP Annotation
 
 To generate a VCF file containing all variants and annotate the variants using VEP, we plan to have the management command `annotate`. 
 
-Since this command requires docker, we currently run this step manually. Once we implement our docker compose stack, this command will be available.
+Once we implement our docker compose stack, this command will be changed.
 
-Currently, you need to run the following steps manually:
+You can run this step by executing the management command `annotate`:
 
-## Create a VCF file with all variants
-
-```bash
-mkdir GWAS_vep_directory
-backend/utils/preprocessing/bash/generate_full_variants_vcf.sh GWAS_norm_dir GWAS_vcf_file
+```python
+python manage.py annotate
 ```
 
-## Setup VEP
+## Typesense
 
-```bash
-backend/utils/preprocessing/bash/setup_vep.sh GWAS_vep_directory genome_build
-```
-
-## Annotate variants with VEP
-
-```bash
-backend/utils/preprocessing/bash/run_vep.sh GWAS_vcf_file GWAS_annotated_vcf_file GWAS_vcf_dir genome_build
-```
-
-
-# Typesense Initialization
-
-To initialize the typesense engine for the autocomplete functionality in the frontend, we plan to have the management command `typesense`. 
-
-Since this command requires docker, we currently run this step manually. Once we implement our docker compose stack, this command will be available.
-
-Currently, you need to run the following steps manually:
-
-First, pull the docker image:
-
-```bash
-docker pull typesense/typesense:29.0.rc15  
-```
-
-Then, create a volume:
-
-```bash
-docker volume create GWAS_typesense
-```
-
-Finally, run the container:
-
-```bash
- docker run -d --name typesense-server -p 8108:8108 -v GWAS_typesense:/data typesense/typesense:29.0.rc15 --data-dir /data --backend --api-key=xyz --enable-cors
-```
-
-Now you can run the typesense management command to initialize the typesense engine:
+You can run the typesense management command to fill the Typesense database with the necessary data:
 
 ```python
 python manage.py typesense
 ```
 
-# Run Django backend
+## MAGMA Execution
 
-After all preprocessing steps have been completed and the typesense docker container is up, you can run the Django backend.
-
-```bash
-python manage.py runserver 0.0.0.0:5136
-```
-
-Attention: the port needs to be the same as specified in the .env and remember to forward the ports.
-
-# MAGMA Execution
-
-## Download MAGMA
+### Download MAGMA
 
 You can download the MAGMA software from the official website: https://ctg.cncr.nl/software/MAGMA
 
@@ -125,7 +85,7 @@ unzip magma.zip
 
 Specify the location of the MAGMA executable in the .env file!
 
-## Download Reference Data
+### Download Reference Data
 
 You can download the reference data from the official website: https://ctg.cncr.nl/software/MAGMA#reference_data
 
@@ -139,6 +99,13 @@ unzip g1000_eur.zip
 
 Specify the location of the LD reference data in the .env file!
 
-## Run MAGMA
 
-TODO
+# Run Django backend
+
+After all preprocessing steps have been completed and the typesense docker container is up, you can run the Django backend.
+
+```bash
+python manage.py runserver 0.0.0.0:5136
+```
+
+Attention: the port needs to be the same as specified in the .env and remember to forward the ports.

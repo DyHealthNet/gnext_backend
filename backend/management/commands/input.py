@@ -28,7 +28,6 @@ class Command(BaseCommand):
 
     @staticmethod
     def generate_manhattan_qq_files():
-        GWAS_dir = config("GWAS_DIR")
         pheno_file = config("PHENO_FILE")
 
         GWAS_norm_dir = settings.GWAS_NORM_DIR
@@ -43,25 +42,30 @@ class Command(BaseCommand):
         # Normalize GWAS files
         for i, r in pheno_dt.iterrows():
 
-            # TODO: Bastienne -> add rsID to norm files -> override files
-
-            # Generate Manhattan and QQ JSON file
-            # TODO: Lisi -> check if json files include rsIDs
+            # Check if the Manhattan file already exists -> if yes, no need to process file again
             manhattan_filepath = os.path.join(GWAS_manhattan_dir, r['filename'].split(".")[0] + "_manhattan.json")
             qq_filepath = os.path.join(GWAS_qq_dir, r['filename'].split(".")[0] + "_qq.json")
             norm_filepath = os.path.join(GWAS_norm_dir, r['filename'] + ".gz")
+            magma_filepath = "" # TODO: Bastienne
 
-            # Strong assumption: there are no invalid lines when a file reaches this stage; this operates on normalized data
-            # Create two fresh readers
-            reader_for_manhattan = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
-            reader_for_qq = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+            if( os.path.exists(manhattan_filepath) and os.path.exists(qq_filepath)):
+                logger.info("Skipping file %s, because input data (Manhattan, QQ, MAGMA) already present for file: ", r['filename'])
+                continue
+            else:
+                # TODO: Bastienne -> add rsID to norm files
 
-            Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
-            logger.info("COMPLETED: Manhattan JSON file generation of GWAS file: %s", norm_filepath)
-            Command.generate_qq(reader_for_qq, qq_filepath)
-            logger.info("COMPLETED: QQ JSON file generation of GWAS file: %s", norm_filepath)
+                # Generate Manhattan and QQ JSON file
+                # Strong assumption: there are no invalid lines when a file reaches this stage; this operates on normalized data
+                # Create two fresh readers
+                reader_for_manhattan = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+                reader_for_qq = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
 
-            # TODO: Bastienne -> add MAGMA input generation here
+                Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
+                logger.info("COMPLETED: Manhattan JSON file generation of GWAS file: %s", norm_filepath)
+                Command.generate_qq(reader_for_qq, qq_filepath)
+                logger.info("COMPLETED: QQ JSON file generation of GWAS file: %s", norm_filepath)
+
+                # TODO: Bastienne -> add MAGMA input generation here
 
     @staticmethod
     def generate_manhattan(reader, out_filename: str) -> bool:

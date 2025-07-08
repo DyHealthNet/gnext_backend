@@ -6,15 +6,20 @@ set -euo pipefail
 
 INPUT_VCF="$1"
 OUTPUT_VCF="$2"
-VEP_CACHE_DIR="$3"
+VEP_DIR="$3"
 GENOME_BUILD=$4
 WINDOW_UP=$5
 WINDOW_DOWN=$6
 
+VEP_CACHE_DIR="$VEP_DIR/vep_data/"
+
 echo "Starting VEP run at $(date)"
 
+echo "$VEP_CACHE_DIR"
+
 docker run \
-  -v "$VEP_CACHE_DIR":/data \
+  --workdir /opt/vep/ \
+  -v "$VEP_CACHE_DIR":/opt/vep/.vep \
   ensemblorg/ensembl-vep \
   vep \
     --input_file "$INPUT_VCF" \

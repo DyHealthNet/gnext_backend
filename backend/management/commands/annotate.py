@@ -28,21 +28,25 @@ class Command(BaseCommand):
         window_up = config("MAGMA_WINDOW_UP", cast=int)
         window_down = config("MAGMA_WINDOW_DOWN", cast=int)
 
-        # Generate full VCF file TODO: check how to do this in Docker -> because docker pull and docker run executed
-        try:
-            subprocess.run(["bash", "backend/utils/preprocessing/bash/generate_full_variants_vcf.sh", GWAS_norm_dir, os.path.join(GWAS_vep_dir, GWAS_vcf_file)], check=True)
-        except subprocess.CalledProcessError as e:
-            raise CommandError(f"Failed to generate full VCF file: {e}")
+        # TODO: currently not generating the VCF file even if new phenotypes have been added
 
-        # TODO: Lisi -> remove initialization to setup
-        # Download VEP docker image and install cache TODO: check how to do this in Docker -> because docker pull and docker run executed
-        try:
-            subprocess.run(["bash", "backend/utils/preprocessing/bash/setup_vep.sh", GWAS_vep_dir, genome_build], check = True)
-        except subprocess.CalledProcessError as e:
-            raise CommandError(f"Failed to setup VEP: {e}")
+        # Generate full VCF file
+        # Check if GWAS_annotated_vcf_file already exists
+        if os.path.exists(os.path.join(GWAS_vep_dir, GWAS_vcf_file)):
+            logger.info("Skipping VCF generation, because VCF file already exists.")
+        else:
+            try:
+                subprocess.run(["bash", "backend/utils/preprocessing/bash/generate_full_variants_vcf.sh", GWAS_norm_dir, os.path.join(GWAS_vep_dir, GWAS_vcf_file)], check=True)
+                logger.info("COMPLETED: Generation of VCF file!")
+            except subprocess.CalledProcessError as e:
+                raise CommandError(f"Failed to generate full VCF file: {e}")
 
-        # Run VEP annotation TODO: needs to be changed when backend in Docker -> because docker run executed
-        try:
-            subprocess.run(["bash", "../../utils/preprocessing/bash/run_vep.sh", GWAS_vcf_file, GWAS_annotated_vcf_file, GWAS_vep_dir, genome_build, window_up, window_down], check=True)
-        except subprocess.CalledProcessError as e:
-            raise CommandError(f"Failed to run VEP: {e}")
+        # Run VEP annotation
+        if os.path.exists(os.path.join(GWAS_vep_dir, GWAS_annotated_vcf_file)):
+            logger.info("Skipping VCF annotation, because annotated VCF file already exists.")
+        else:
+            try:
+                subprocess.run(["bash", "backend/utils/preprocessing/bash/run_vep.sh", GWAS_vcf_file, GWAS_annotated_vcf_file, GWAS_vep_dir, genome_build, str(window_up), str(window_down)], check=True)
+                logger.info("COMPLETED: Annotation of VCF file!")
+            except subprocess.CalledProcessError as e:
+                raise CommandError(f"Failed to run VEP: {e}")
