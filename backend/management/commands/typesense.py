@@ -24,13 +24,12 @@ class Command(BaseCommand):
            batch_size = int(config("BATCH_SIZE"))
            pheno_file = config('PHENO_FILE')
 
-
            GWAS_annotated_vcf_file = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
 
            # Initialize the typesense client
-           logger.info("Starting typesense initialization.")
-           self.initialize_typesense(GWAS_annotated_vcf_file, pheno_file, batch_size, api_key, typesense_host, typesense_port)
-           logger.info("Finished typesense initialization!")
+           logger.info("Starting filling of typesense.")
+           self.fill_typesense(GWAS_annotated_vcf_file, pheno_file, batch_size, api_key, typesense_host, typesense_port)
+           logger.info("Finished filling of typesense!")
        except Exception as e:
            # print stack trace
            traceback.print_exc()
@@ -38,9 +37,9 @@ class Command(BaseCommand):
            sys.exit(1)
 
     @staticmethod
-    def initialize_typesense(GWAS_annotated_vcf_file, pheno_file, batch_size, api_key, typesense_host, typesense_port):
+    def fill_typesense(GWAS_annotated_vcf_file, pheno_file, batch_size, api_key, typesense_host, typesense_port):
         """
-        Initialize Typesense with the provided parameters.
+        Fill Typesense with the provided parameters.
         """
         client = typesense.Client({
             'api_key': api_key,
@@ -52,29 +51,10 @@ class Command(BaseCommand):
             'connection_timeout_seconds': 10
         })
 
-        schema_autocomplete = {
-            "name": "autocomplete",
-            "fields": [
-                {"name": "type", "type": "string", "facet": True},
-                {"name": "id", "type": "string"},
-                {"name": "description", "type": "string"},
-                {"name": "external_ref", "type": "string"},
-                {"name": "category", "type": "string"},
-                {"name": "filename", "type": "string"},
-            ]
-        }
-
-        try:
-            client.collections["autocomplete"].delete()
-        except Exception:
-            pass
-
-        client.collections.create(schema_autocomplete)
-
         # Importing phenotypes
         pheno_dt = pd.read_csv(pheno_file)
 
-        # Importing phenotypes
+        # Importing phenotypes (here don't check whether phenotype already in typesense, because upsert does this)
         for i, r in pheno_dt.iterrows():
             logger.info(f"Importing phenotype to typesense: {r['phenocode']}")
 
@@ -87,7 +67,7 @@ class Command(BaseCommand):
                 'category': r['category'],
                 'filename': r['filename'],
             }
-            client.collections["autocomplete"].documents.create(doc)
+            client.collections["autocomplete"].documents.upsert(doc)
 
         # Import variants
         documents = []

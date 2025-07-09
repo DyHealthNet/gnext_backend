@@ -33,12 +33,11 @@ class Command(BaseCommand):
             "BATCH_SIZE",
             "MAGMA_WINDOW_UP",
             "MAGMA_WINDOW_DOWN",
-            "MAGMA_EXEC",
             "MAGMA_LD_REF",
         ]
 
         missing = []
-        file_checks = ["PHENO_FILE", "GWAS_DIR", "MAGMA_LD_REF", "MAGMA_EXEC"]
+        file_checks = ["PHENO_FILE", "GWAS_DIR", "MAGMA_LD_REF"]
         for key in required_keys:
             try:
                 value = config(key)

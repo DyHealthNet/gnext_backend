@@ -21,8 +21,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
            logger.info("Starting MAGMA execution of GWAS summary statistics files.")
-           #self.prepare_MAGMA_mapping_input()
-           #self.prepare_MAGMA_GWAS_input()
+           self.prepare_MAGMA_mapping_input()
+           self.prepare_MAGMA_GWAS_input() # TODO: Bastienne -> remove to input command
            self.run_MAGMA()
            logger.info("Finished MAGMA execution of GWAS summary statistics files!")
        except Exception as e:
@@ -226,7 +226,7 @@ class Command(BaseCommand):
         pheno_dt = pd.read_csv(pheno_file)
 
         n_samples = config('N_SAMPLES')
-        for i, r in pheno_dt.iterrows():
+        for i, r in pheno_dt.iterrows(): # TODO: Bastienne -> check if already run -> if yes, skip phenotype !
             gwas_file = r['filename']
             sample_file = os.path.join(settings.GWAS_NORM_DIR, gwas_file.replace(".tsv.bgz", ".txt"))
             magma_file = os.path.join(settings.GWAS_MAGMA_RESULT_DIR, gwas_file.replace(".tsv.bgz", ""))
