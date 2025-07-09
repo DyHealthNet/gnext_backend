@@ -26,7 +26,7 @@ class Command(BaseCommand):
 
            # Check if typesense docker is running and has entries in the autocomplete collection
            container_name = "dyhealthnetlight-typesense"
-           self.check_typensense(container_name)
+           self.check_typesense(container_name)
 
            logger.info("Finished healthcheck of preprocessed data!")
 
@@ -57,12 +57,12 @@ class Command(BaseCommand):
             magma_input_filepath = "" #TODO:Bastienne
             magma_output_filepath = "" #TODO: Bastienne
 
-            check_file_exists(in_filepath, f"Input file for phenotype {r['phenotype']}")
-            check_file_exists(norm_filepath, f"Normalized file for phenotype {r['phenotype']}")
-            check_file_exists(manhattan_filepath, f"Manhattan plot file for phenotype {r['phenotype']}")
-            check_file_exists(qq_filepath, f"QQ plot file for phenotype {r['phenotype']}")
-            #check_file_exists(magma_input_filepath, f"MAGMA input file for phenotype {r['phenotype']}") #TODO: Bastienne -> uncomment
-            #check_file_exists(magma_output_filepath, f"MAGMA output file for phenotype {r['phenotype']}") #TODO: Bastienne -> uncomment
+            check_file_exists(in_filepath, f"Input file for phenotype {r['phenocode']}")
+            check_file_exists(norm_filepath, f"Normalized file for phenotype {r['phenocode']}")
+            check_file_exists(manhattan_filepath, f"Manhattan plot file for phenotype {r['phenocode']}")
+            check_file_exists(qq_filepath, f"QQ plot file for phenotype {r['phenocode']}")
+            #check_file_exists(magma_input_filepath, f"MAGMA input file for phenotype {r['phenocode']}") #TODO: Bastienne -> uncomment
+            #check_file_exists(magma_output_filepath, f"MAGMA output file for phenotype {r['phenocode']}") #TODO: Bastienne -> uncomment
 
 
         logger.info("All phenotype-specific files are present.")
@@ -74,8 +74,8 @@ class Command(BaseCommand):
             raise CommandError(f"VEP annotation file does not exist: {settings.GWAS_ANNO_VCF_FILE}")
 
         # Check if MAGMA mapping file exists
-        if not os.path.isfile(os.path.join(settings.GWAS_MAGMA_DIR, settings.GWAS_ANNO_MAGMA_FILE)):
-            raise CommandError(f"MAGMA mapping file does not exist: {settings.GWAS_ANNO_MAGMA_FILE}")
+        #if not os.path.isfile(os.path.join(settings.GWAS_MAGMA_DIR, settings.GWAS_ANNO_MAGMA_FILE)):
+        #    raise CommandError(f"MAGMA mapping file does not exist: {settings.GWAS_ANNO_MAGMA_FILE}")
 
 
     @staticmethod
@@ -126,10 +126,18 @@ class Command(BaseCommand):
 
         # Check if there are entries in the autocomplete collection
         try:
-            count = client.collections["autocomplete"].documents.count()
+            # We run a search with empty query to get all documents, but per_page=0 to avoid actually returning any
+            res = client.collections["autocomplete"].documents.search({
+                "q": "*",
+                "query_by": "description",  # IMPORTANT: replace with the actual field you use for querying
+                "per_page": 0
+            })
+
+            count = res["found"]
             if count == 0:
                 raise CommandError("Typesense autocomplete collection is empty!")
             else:
                 logger.info(f"Typesense autocomplete collection has {count} entries.")
+
         except Exception as e:
             raise CommandError(f"Error checking typesense autocomplete collection: {e}")

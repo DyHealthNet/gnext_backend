@@ -38,7 +38,7 @@ class Command(BaseCommand):
         ]
 
         missing = []
-        file_checks = ["PHENO_FILE", "GWAS_DIR", "MAGMA_LD_REF"]
+        file_checks = {"PHENO_FILE":"file", "GWAS_DIR":"dir", "MAGMA_LD_REF":"dir"}
         for key in required_keys:
             try:
                 value = config(key)
