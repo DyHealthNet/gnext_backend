@@ -48,7 +48,7 @@ class Command(BaseCommand):
             norm_filepath = os.path.join(GWAS_norm_dir, r['filename'] + ".gz")
             magma_filepath = "" # TODO: Bastienne
 
-            if( os.path.exists(manhattan_filepath) and os.path.exists(qq_filepath)):
+            if( os.path.exists(manhattan_filepath)):
                 logger.info("Skipping file %s, because input data (Manhattan, QQ, MAGMA) already present for file: ", r['filename'])
                 continue
             else:
