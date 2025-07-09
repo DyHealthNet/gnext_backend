@@ -12,6 +12,8 @@ import pandas as pd
 from backend.utils.preprocessing.zorp.zorp import parsers, sniffers
 import backend.utils.preprocessing.magma.magma_norm_exec as magma_exec
 from django.conf import settings
+import urllib.request
+import zipfile
 
 logger = logging.getLogger("backend")
 
@@ -19,7 +21,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
            logger.info("Starting MAGMA execution of GWAS summary statistics files.")
-           self.prepare_MAGMA_mapping_input()
            self.run_MAGMA()
            logger.info("Finished MAGMA execution of GWAS summary statistics files!")
        except Exception as e:
@@ -58,12 +59,8 @@ class Command(BaseCommand):
 
         n_samples = config('N_SAMPLES')
         magma_model = config('MAGMA_MODEL')
-        i = 0
-        # Normalize GWAS files
-        for i, r in pheno_dt.iterrows():
-            if i == 0:
-                i += 1
-                continue
+
+        for i, r in pheno_dt.iterrows(): # TODO: Bastienne -> check if already run -> if yes, skip phenotype !
             gwas_file = r['filename']
             sample_file = os.path.join(GWAS_magma_norm_dir, gwas_file.replace(".tsv.bgz", ".txt"))
             magma_file = os.path.join(settings.GWAS_MAGMA_RESULT_DIR, gwas_file.replace(".tsv.bgz", ""))

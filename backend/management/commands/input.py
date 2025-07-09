@@ -54,10 +54,6 @@ class Command(BaseCommand):
 
         # Normalize GWAS files
         for i, r in pheno_dt.iterrows():
-            if i == 0:
-                i+=1
-                continue
-            logger.debug(f"file: {r['filename']}")
 
             # Check if the Manhattan file already exists -> if yes, no need to process file again
             manhattan_filepath = os.path.join(GWAS_manhattan_dir, r['filename'].split(".")[0] + "_manhattan.json")
@@ -78,14 +74,15 @@ class Command(BaseCommand):
                 # Generate Manhattan and QQ JSON file
                 # Strong assumption: there are no invalid lines when a file reaches this stage; this operates on normalized data
                 # Create two fresh readers
-                #reader_for_manhattan = sniffers.guess_gwas_standard(norm_with_rsid_filepath).add_filter('neg_log_pvalue')
-                #reader_for_qq = sniffers.guess_gwas_standard(norm_with_rsid_filepath).add_filter('neg_log_pvalue')
+                reader_for_manhattan = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+                reader_for_qq = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
                 reader_for_magma = sniffers.guess_gwas_standard(norm_with_rsid_filepath).add_filter('neg_log_pvalue')
 
-                #Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
+                Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
                 logger.info("COMPLETED: Manhattan JSON file generation of GWAS file: %s", norm_filepath)
-                #Command.generate_qq(reader_for_qq, qq_filepath)
+                Command.generate_qq(reader_for_qq, qq_filepath)
                 logger.info("COMPLETED: QQ JSON file generation of GWAS file: %s", norm_filepath)
+
                 # TODO: Bastienne -> add MAGMA input generation here
                 Command.generate_magma_input(reader_for_magma, magma_filepath)
                 logger.info("COMPLETED:MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
