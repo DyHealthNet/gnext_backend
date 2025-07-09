@@ -50,7 +50,7 @@ class Command(BaseCommand):
         # Normalize GWAS files
         for i, r in pheno_dt.iterrows():
             in_filepath = os.path.join(GWAS_dir, r['filename'])
-            norm_filepath = os.path.join(GWAS_norm_dir, r['filename'])
+            norm_filepath = os.path.join(GWAS_norm_dir, r['filename'].split(".")[0])
             # Check if normalized file already exists
             if os.path.exists(norm_filepath + ".gz"):
                 logger.info("Skipping normalization for %s, file already exists.", norm_filepath)

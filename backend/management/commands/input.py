@@ -45,7 +45,7 @@ class Command(BaseCommand):
             # Check if the Manhattan file already exists -> if yes, no need to process file again
             manhattan_filepath = os.path.join(GWAS_manhattan_dir, r['filename'].split(".")[0] + "_manhattan.json")
             qq_filepath = os.path.join(GWAS_qq_dir, r['filename'].split(".")[0] + "_qq.json")
-            norm_filepath = os.path.join(GWAS_norm_dir, r['filename'] + ".gz")
+            norm_filepath = os.path.join(GWAS_norm_dir, r['filename'].split(".")[0] + ".gz")
             magma_filepath = "" # TODO: Bastienne
 
             if( os.path.exists(manhattan_filepath)):
