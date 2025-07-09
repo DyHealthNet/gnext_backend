@@ -158,6 +158,7 @@ GWAS_VCF_FILE = "full_variants.vcf"
 GWAS_ANNO_VCF_FILE = "annotated_full_variants.vcf.bgz"
 GWAS_MAGMA_DIR = os.path.join(GWAS_DIR, "GWAS_magma")
 GWAS_ANNO_MAGMA_FILE = "magma.genes.annot"
+GWAS_MAGMA_RESULT_DIR = os.path.join(GWAS_MAGMA_DIR, "MAGMA_results")
 
 
 LOGGING = {

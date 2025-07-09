@@ -1,3 +1,5 @@
+import time
+
 from django.core.management.base import BaseCommand
 import sys
 import pandas as pd
@@ -8,8 +10,11 @@ from decouple import config
 from backend.utils.preprocessing.locuszoom import manhattan, qq
 import math
 import json
+
+from backend.utils.preprocessing.snp_to_rsid_mapping import setup_rsid_mapping_lmdb, map_and_write_rsid
 from backend.utils.preprocessing.zorp.zorp import sniffers
 from django.conf import settings
+import backend.utils.preprocessing.magma.magma_norm_exec as magma_exec
 
 
 logger = logging.getLogger("backend")
@@ -17,8 +22,9 @@ logger = logging.getLogger("backend")
 class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
-           logger.info("Starting generation of Manhanttan and QQ files.")
+           logger.info("Starting generation of Manhanttan, QQ and Magma input files.")
            self.generate_manhattan_qq_files()
+           self.prepare_MAGMA_mapping_input()
            logger.info("Finished generation of Manhattan and QQ files!")
        except Exception as e:
            # print stack trace
@@ -35,38 +41,54 @@ class Command(BaseCommand):
         os.makedirs(GWAS_manhattan_dir, exist_ok=True)
         GWAS_qq_dir = settings.GWAS_QQ_DIR
         os.makedirs(GWAS_qq_dir, exist_ok=True)
+        GWAS_magma_dir = settings.GWAS_MAGMA_DIR
+        GWAS_magma_norm_dir = os.path.join(GWAS_magma_dir, "input_GWAS_norm")
+        os.makedirs(GWAS_magma_norm_dir, exist_ok=True)
+
+        GWAS_annotated_vcf_file = settings.GWAS_ANNO_VCF_FILE
+        lmdb_path = setup_rsid_mapping_lmdb(GWAS_annotated_vcf_file, GWAS_magma_dir) # TODO check if files already contain rsID or give that as user input
 
         # Importing phenotypes
         pheno_dt = pd.read_csv(pheno_file)
+        i = 0
 
         # Normalize GWAS files
         for i, r in pheno_dt.iterrows():
+            if i == 0:
+                i+=1
+                continue
+            logger.debug(f"file: {r['filename']}")
 
             # Check if the Manhattan file already exists -> if yes, no need to process file again
             manhattan_filepath = os.path.join(GWAS_manhattan_dir, r['filename'].split(".")[0] + "_manhattan.json")
             qq_filepath = os.path.join(GWAS_qq_dir, r['filename'].split(".")[0] + "_qq.json")
             norm_filepath = os.path.join(GWAS_norm_dir, r['filename'] + ".gz")
-            magma_filepath = "" # TODO: Bastienne
+            norm_with_rsid_filepath = norm_filepath.replace('.tsv.bgz.gz', '_rsIDadded.tsv.bgz.gz')
+            magma_filepath = os.path.join(GWAS_magma_norm_dir, r['filename'].replace(".tsv.bgz", ".txt"))
 
-            if( os.path.exists(manhattan_filepath) and os.path.exists(qq_filepath)):
+            if( os.path.exists(manhattan_filepath) and os.path.exists(qq_filepath) and os.path.exists(magma_filepath)): #TODO Split check
                 logger.info("Skipping file %s, because input data (Manhattan, QQ, MAGMA) already present for file: ", r['filename'])
                 continue
             else:
-                # TODO: Bastienne -> add rsID to norm files
-
+                if not os.path.exists(norm_with_rsid_filepath):
+                    map_and_write_rsid(norm_filepath, lmdb_path) # TODO check if files already contain rsID or give that as user input
+                    logger.info("COMPLETED: Added rsid to GWAS file: %s", norm_filepath)
+                else:
+                    logger.debug("GWAS file with rsid already present: %s", norm_with_rsid_filepath)
                 # Generate Manhattan and QQ JSON file
                 # Strong assumption: there are no invalid lines when a file reaches this stage; this operates on normalized data
                 # Create two fresh readers
-                reader_for_manhattan = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
-                reader_for_qq = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+                #reader_for_manhattan = sniffers.guess_gwas_standard(norm_with_rsid_filepath).add_filter('neg_log_pvalue')
+                #reader_for_qq = sniffers.guess_gwas_standard(norm_with_rsid_filepath).add_filter('neg_log_pvalue')
+                reader_for_magma = sniffers.guess_gwas_standard(norm_with_rsid_filepath).add_filter('neg_log_pvalue')
 
-                Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
+                #Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
                 logger.info("COMPLETED: Manhattan JSON file generation of GWAS file: %s", norm_filepath)
-                Command.generate_qq(reader_for_qq, qq_filepath)
+                #Command.generate_qq(reader_for_qq, qq_filepath)
                 logger.info("COMPLETED: QQ JSON file generation of GWAS file: %s", norm_filepath)
-
                 # TODO: Bastienne -> add MAGMA input generation here
-
+                Command.generate_magma_input(reader_for_magma, magma_filepath)
+                logger.info("COMPLETED:MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
     @staticmethod
     def generate_manhattan(reader, out_filename: str) -> bool:
         """Generate manhattan plot data for the processed file"""
@@ -126,3 +148,73 @@ class Command(BaseCommand):
             json.dump(rv, f)
         return True
 
+    def generate_magma_input(reader, out_filename):
+        start_time = time.time()
+        reader.write(out_filename, columns=["rsid", "pval"], make_tabix=False)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        logger.debug(f"Time taken to normalize the GWAS stats file for Magma: {elapsed_time:.2f} seconds")
+
+    def prepare_MAGMA_mapping_input(self):
+
+        GWAS_annotated_vcf_file = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
+
+        GWAS_magma_dir = settings.GWAS_MAGMA_DIR
+        os.makedirs(GWAS_magma_dir, exist_ok=True)
+        GWAS_anno_magma_file = os.path.join(GWAS_magma_dir, settings.GWAS_ANNO_MAGMA_FILE)
+        # TODO if file of present has the correct window sizes in the header lines -> if not overwrite
+        if not os.path.exists(GWAS_anno_magma_file):
+
+            without_gene_terms = ["regulatory_region_variant", "TF_binding_site_variant", "intergenic_variant",
+                                  "intron_variant"]
+
+            csq_fields = self.extract_csq_fields(GWAS_annotated_vcf_file)
+
+            window_size_up = config("MAGMA_WINDOW_UP")
+            window_size_down = config("MAGMA_WINDOW_DOWN")
+
+            gene_to_rsids = defaultdict(set)
+
+            i = 1
+            with gzip.open(GWAS_annotated_vcf_file, 'rt') as f:
+                for line in f:
+                    if line.startswith('#'):
+                        continue
+                    parts = line.strip().split('\t')
+                    if len(parts) < 8:
+                        continue
+                    info = parts[7]
+                    if "CSQ=" not in info:
+                        continue
+                    csq_data = info.split("CSQ=")[1].split(";")[0]
+                    entries = csq_data.split(',')
+                    i += 1
+                    for entry in entries:
+                        values = entry.split('|')
+                        csq_dict = dict(zip(csq_fields, values))
+
+                        if csq_dict.get("BIOTYPE") != "protein_coding" or csq_dict.get("Feature_type") != "Transcript":
+                            continue
+
+                        consequences = csq_dict.get("Consequence", "").split("&")
+                        gene = csq_dict.get("Gene")
+                        ids = csq_dict.get("Existing_variation", "").split("&")
+                        rsid = next((i for i in ids if i.startswith("rs")), None)
+
+                        if not gene or not rsid:
+                            continue
+
+                        # Check for consequences not in without_gene_terms
+                        if any(c not in without_gene_terms for c in consequences):
+                            gene_to_rsids[gene].add(rsid)
+                            continue
+
+                    if i % 100000 == 0:
+                        logger.info(f"Processed {i} lines from VCF file.")
+
+            # Write MAGMA gene annotation file
+            with open(GWAS_anno_magma_file, 'w') as f:
+                f.write("# window_up = " + str(window_size_up) + "\n")
+                f.write("# window_down = " + str(window_size_down) + "\n")
+                for gene, rsids in gene_to_rsids.items():
+                    f.write(f"{gene}\t1:1:2\t{' '.join(rsids)}\n")

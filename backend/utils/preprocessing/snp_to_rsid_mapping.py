@@ -1,0 +1,134 @@
+import logging
+import os
+import shutil
+import struct
+import tempfile
+import time
+import re
+import lmdb
+import msgpack
+import pysam
+from decouple import config
+from backend.utils.preprocessing.zorp.zorp import parsers, sniffers, readers, lookups
+
+logger = logging.getLogger("backend")
+
+def map_and_write_rsid(norm_filepath, lmdb_path):
+
+    if os.path.exists(norm_filepath):
+        logger.info(f"Updating nomalized GWAS stats with their rsID.")
+
+        reader = sniffers.guess_gwas_generic(norm_filepath)
+
+        start_time = time.time()
+        status = add_rsid_to_Gwas_stats(reader, norm_filepath, genome_build='GRCh37',
+                                                   debug_mode=False, lmdb_path=lmdb_path)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        logger.debug(f"Time taken to map and add rsID to normalized GWAS stats: {elapsed_time:.2f} seconds")
+    else:
+        logger.debug(f"Normalized GWAS stats file {norm_filepath} not available. Abort rsid mapping...")
+
+def add_rsid_to_Gwas_stats(reader, output_path, genome_build='GRCh37', debug_mode=False, lmdb_path=None):
+    """
+    Initial content ingestion: map rsID and write the new normalized file in standardized format with ending _rsidadded.
+    If file is successfully written the original can be deleted if delete_original is set to true
+    """
+    delete_original = False  # Set to False if you want to keep the original
+
+    build = lmdb_path + "/data.mdb" if lmdb_path else genome_build
+    rsid_finder = lookups.SnpToRsid(build, test=debug_mode)
+    reader.add_lookup('rsid', lambda variant: rsid_finder(variant.chrom, variant.pos, variant.ref, variant.alt))
+
+    columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta',
+               'alt_allele_freq']
+
+    # Build new output filename with _rsIDadded
+    new_output_path = output_path.replace(".tsv.bgz.gz", "_rsIDadded.tsv.bgz")
+    if not os.path.exists(new_output_path):
+        try:
+            reader.write(new_output_path, make_tabix=True, columns=columns)
+        except Exception as e:
+            os.remove(new_output_path)
+            logger.error(f"reader.write() failed. Deleted original file: {output_path}. Error: {e}")
+            raise
+
+    # Optionally delete original
+    if delete_original:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        if os.path.exists(output_path + ".tbi"):
+            os.remove(output_path + ".tbi")
+        logger.debug(f"Deleted original file and index: {output_path}")
+
+def setup_rsid_mapping_lmdb(vcf_path, magma_dir, num_chroms=25, map_size=10 ** 9):
+    lmdb_path = magma_dir + "/lmdb_" + config('VITE_GENOME_BUILD')
+    # Only build the LMDB if it doesn't exist or is missing required files
+    if not os.path.isdir(lmdb_path) or not os.path.exists(os.path.join(lmdb_path, "data.mdb")):
+        logger.info("LMDB not found, creating...")
+        start_time = time.time()
+        build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, map_size=10 * 1024 ** 3) #TODO check how to automatically set map size accoring to the umber of SNPs/ rows in vcf
+        end_time = time.time()
+        logger.debug(f"Time taken to produce LMDB mapping lib: {end_time - start_time:.2f} seconds")
+    else:
+        logger.info("LMDB already exists, skipping creation.")
+    return lmdb_path
+
+def build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, num_chroms=25, map_size=10 ** 9):
+    # Time taken to produce Lmdb mapping lib: 529.44 seconds
+    env = lmdb.open(lmdb_path, map_size=map_size, max_dbs=num_chroms)
+    db_handles = {}
+
+    vcf = pysam.VariantFile(vcf_path)
+
+    with env.begin(write=True) as txn:
+        for rec in vcf.fetch():
+            chrom = rec.chrom
+
+            # Open DB handle per chrom if not already open
+            if chrom not in db_handles:
+                db_handles[chrom] = env.open_db(chrom.encode(), txn=txn)
+
+            db = db_handles[chrom]
+            pos = rec.pos
+            ref = rec.ref
+
+            # Dictionary to hold ref/alt → rsID for this position
+            refalt_to_rsid = {}
+
+            for alt in rec.alts:
+                key = f"{chrom}:{pos}_{ref}/{alt}"
+
+                # Parse rsID from CSQ
+                csq_list = rec.info.get('CSQ')
+                rsid = None
+                if csq_list:
+                    for csq_entry in csq_list:
+                        annotations = re.split(r'[,&]', csq_entry)
+                        for annot in annotations:
+                            fields = annot.split('|')
+                            if len(fields) > 17:
+                                candidate = fields[17] #TODO dynamically pull rsid column
+                                if candidate.startswith('rs'):
+                                    rsid = candidate
+                                    break
+                        if rsid:
+                            break
+
+                if rsid is None:
+                    # Use '.' or skip if no rsID found
+                    continue
+
+                refalt = f"{ref}/{alt}"
+                # Store only the integer part of rsID, e.g. rs12345 → 12345
+                rsid_int = int(rsid.replace('rs', ''))
+                refalt_to_rsid[refalt] = rsid_int
+
+            # If we found any ref/alt mappings for this position, store in LMDB
+            if refalt_to_rsid:
+                key_bytes = struct.pack('I', pos)  # pack position as 4-byte int
+                value_bytes = msgpack.packb(refalt_to_rsid, use_bin_type=True)
+                txn.put(key_bytes, value_bytes, db=db)
+
+    env.sync()
+    env.close()

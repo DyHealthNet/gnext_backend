@@ -77,38 +77,5 @@ def normalize_contents_lib(reader, output_path, genome_build='GRCh37', debug_mod
     In "debug mode", the ingest process will use a smaller (test environment optimized) version of the
         rsid_finder lookup.
     """
-    build = lmdb_path if lmdb_path else genome_build
-    rsid_finder = lookups.SnpToRsid(build, test=debug_mode)
-    reader.add_lookup('rsid', lambda variant: rsid_finder(variant.chrom, variant.pos, variant.ref, variant.alt))
-    # either this
-    #reader.write(output_path, columns=["rsid", "pval"], make_tabix=False)
-    # or this which is timewise the same but gives more flexibility like omitting NA pvalue or NA rsID variants
-    with open(output_path, 'w') as out_f:
-        # Write header for MAGMA input
-        out_f.write("SNP\tP\n")
-
-        count_skip = 0
-        count_out = 0
-        for record in reader:
-            # Example fields — adapt to your parser's attributes
-            rs_id = record.rsid
-            pval = record.pval  # assumed -log10(p)
-
-            # Filter out/Skip invalid p-values
-            if pval is None or not (0 < pval <= 1):
-                count_skip+=1
-                #logger.debug(f"Skipping invalid p-value for SNP {rs_id}: {pval}")
-                continue
-
-            # Map SNP ID to rsID if mapping is given
-            if rs_id is None:
-                count_skip += 1
-                #logger.debug(f"Skipping unmapped SNP")
-                continue  # skip unmapped
-
-            # Write to output
-            out_f.write(f"{rs_id}\t{pval}\n")
-            count_out += 1
-
-        logger.debug(f"Skiped {count_skip} rows, wrote {count_out} normalized rows")
+    reader.write(output_path, columns=["rsid", "pval"], make_tabix=False)
     return True
