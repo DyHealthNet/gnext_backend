@@ -4,6 +4,7 @@ from decouple import config
 import os
 from django.core.management import CommandError
 from decouple import UndefinedValueError
+import pandas as pd
 
 logger = logging.getLogger("backend")
 
@@ -67,3 +68,21 @@ class Command(BaseCommand):
             raise CommandError(f"Missing environment variables: {', '.join(missing)}")
         else:
             logger.info("All required environment variables are present.")
+
+
+        # Check if all required columns in pheno_file are present
+        # TODO: Lisi
+
+        # Check if all GWAS stats files are in the GWAS_DIR
+        GWAS_dir = config("GWAS_DIR")
+        pheno_file = config("PHENO_FILE")
+
+        # Importing phenotype table
+        pheno_dt = pd.read_csv(pheno_file)
+
+        for i, r in pheno_dt.iterrows():
+            in_filepath = os.path.join(GWAS_dir, r['filename'])
+            if not os.path.isfile(in_filepath):
+                raise CommandError(f"GWAS file does not exist: {in_filepath}")
+
+        logger.info("All GWAS summary statistics files are present.")

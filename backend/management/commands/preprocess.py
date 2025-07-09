@@ -14,6 +14,7 @@ class Command(BaseCommand):
        try:
            logger.info("Starting preprocessing of GWAS summary statistics files.")
            # Call each management command
+           management.call_command("check_env")
            management.call_command("setup")
            management.call_command("normalize")
            management.call_command("input")
