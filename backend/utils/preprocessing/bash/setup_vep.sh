@@ -36,7 +36,6 @@ docker run -t -i \
   -v "$VEP_CACHE_DIR":/opt/vep/.vep \
   -e HOME=/opt/vep \
   --workdir /opt/vep \
-  --user $(id -u):$(id -g) \
   ensemblorg/ensembl-vep \
   INSTALL.pl -a cf -s homo_sapiens -y "$GENOME_BUILD"
 
