@@ -31,7 +31,7 @@ def map_and_write_rsid(norm_filepath, lmdb_path):
 
 def add_rsid_to_Gwas_stats(reader, output_path, genome_build='GRCh37', debug_mode=False, lmdb_path=None):
     """
-    Initial content ingestion: map rsID and write the new normalized file in standardized format with ending _rsidadded.
+    Initial content ingestion: map rsID and write the new normalized file in standardized format with ending _rsid.
     If file is successfully written the original can be deleted if delete_original is set to true
     """
     delete_original = False  # Set to False if you want to keep the original
@@ -43,9 +43,9 @@ def add_rsid_to_Gwas_stats(reader, output_path, genome_build='GRCh37', debug_mod
     columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta',
                'alt_allele_freq']
 
-    # Build new output filename with _rsIDadded
-    new_output_path = output_path.replace(".tsv.bgz.gz", "_rsIDadded.tsv.bgz")
-    if not os.path.exists(new_output_path):
+    # Build new output filename with _rsid suffix (.gz is not needed as write(...,make_tabix=True) will add that autom.)
+    new_output_path = output_path.replace(".gz", "_rsid")
+    if not os.path.exists(new_output_path + ".gz"):
         try:
             reader.write(new_output_path, make_tabix=True, columns=columns)
         except Exception as e:

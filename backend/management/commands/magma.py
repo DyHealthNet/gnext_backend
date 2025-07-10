@@ -6,14 +6,8 @@ import os
 import time
 import subprocess
 from decouple import config
-import gzip
-from collections import defaultdict
 import pandas as pd
-from backend.utils.preprocessing.zorp.zorp import parsers, sniffers
-import backend.utils.preprocessing.magma.magma_norm_exec as magma_exec
 from django.conf import settings
-import urllib.request
-import zipfile
 
 logger = logging.getLogger("backend")
 
@@ -28,19 +22,6 @@ class Command(BaseCommand):
            traceback.print_exc()
            logger.error(f"MAGMA run with VEP failed: {e}")
            sys.exit(1)
-
-    def extract_csq_fields(self, vcf_path):
-        """
-        Extracts the CSQ field names from a VCF file.
-        """
-        with gzip.open(vcf_path, 'rt') as f:
-            for line in f:
-                if line.startswith("##INFO") and "Format:" in line and "CSQ" in line:
-                    parts = line.strip().split("|")
-                    parts[0] = parts[0].split("Format: ")[1]
-                    parts[-1] = parts[-1].strip('">')
-                    return parts
-        raise ValueError("No CSQ format found.")
 
     def run_MAGMA(self):
         magma = config('MAGMA_EXEC')
@@ -60,10 +41,10 @@ class Command(BaseCommand):
         n_samples = config('N_SAMPLES')
         magma_model = config('MAGMA_MODEL')
 
-        for i, r in pheno_dt.iterrows(): # TODO: Bastienne -> check if already run -> if yes, skip phenotype !
+        for i, r in pheno_dt.iterrows():
             gwas_file = r['filename']
-            sample_file = os.path.join(GWAS_magma_norm_dir, gwas_file.replace(".tsv.bgz", ".txt"))
-            magma_file = os.path.join(settings.GWAS_MAGMA_RESULT_DIR, gwas_file.replace(".tsv.bgz", ""))
+            sample_file = os.path.join(GWAS_magma_norm_dir,  r['filename'].split(".")[0] + ".txt")
+            magma_file = os.path.join(settings.GWAS_MAGMA_RESULT_DIR,  r['filename'].split(".")[0])
 
             if not os.path.exists(magma_file):
 
