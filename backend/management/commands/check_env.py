@@ -35,6 +35,7 @@ class Command(BaseCommand):
             "MAGMA_WINDOW_UP",
             "MAGMA_WINDOW_DOWN",
             "MAGMA_LD_REF",
+            "MAGMA_MODEL" # Or set a default here?
         ]
 
         missing = []
