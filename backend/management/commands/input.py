@@ -100,8 +100,6 @@ class Command(BaseCommand):
             else:
                 logger.debug("Skipping generation. Magma input file already exists: %s", magma_filepath)
 
-            return
-
     @staticmethod
     def generate_manhattan(reader, out_filename: str) -> bool:
         """Generate manhattan plot data for the processed file"""
@@ -163,7 +161,7 @@ class Command(BaseCommand):
 
     def generate_magma_input(reader, out_filename, lmdb_path):
         start_time = time.time()
-        # TODO Fix that rsid is not read in and remove the rsid mapping here
+        # TODO Fix that rsid is not read in and then remove the rsid mapping here
         build = lmdb_path + "/data.mdb"
         rsid_finder = lookups.SnpToRsid(build, test=False)
         reader.add_lookup('rsid', lambda variant: rsid_finder(variant.chrom, variant.pos, variant.ref, variant.alt))
