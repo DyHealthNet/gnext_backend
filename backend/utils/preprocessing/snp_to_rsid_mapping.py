@@ -16,20 +16,14 @@ logger = logging.getLogger("backend")
 def map_and_write_rsid(norm_filepath, lmdb_path):
 
     if os.path.exists(norm_filepath):
-        logger.info(f"Updating nomalized GWAS stats with their rsID.")
-
-        reader = sniffers.guess_gwas_generic(norm_filepath)
-
-        start_time = time.time()
-        status = add_rsid_to_Gwas_stats(reader, norm_filepath, genome_build='GRCh37',
+        reader = sniffers.guess_gwas_standard(norm_filepath)
+        status = add_rsid_to_gwas_stats(reader, norm_filepath, genome_build='GRCh37',
                                                    debug_mode=False, lmdb_path=lmdb_path)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        logger.debug(f"Time taken to map and add rsID to normalized GWAS stats: {elapsed_time:.2f} seconds")
     else:
-        logger.debug(f"Normalized GWAS stats file {norm_filepath} not available. Abort rsid mapping...")
+        logger.info(f"Normalized GWAS stats file {norm_filepath} not available. Abort rsid mapping...")
+        # TODO: exit?
 
-def add_rsid_to_Gwas_stats(reader, output_path, genome_build='GRCh37', debug_mode=False, lmdb_path=None):
+def add_rsid_to_gwas_stats(reader, output_path, genome_build='GRCh37', debug_mode=False, lmdb_path=None):
     """
     Initial content ingestion: map rsID and write the new normalized file in standardized format with ending _rsid.
     If file is successfully written the original can be deleted if delete_original is set to true

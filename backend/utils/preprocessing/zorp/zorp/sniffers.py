@@ -269,6 +269,8 @@ def guess_gwas_generic(filename: ty.Union[ty.Iterable, str], *,
         # FIXME: Handle case of files with no header rows
         header_names = header_text.lower().strip().lstrip('#').split(delimiter)
 
+        print(header_names)
+
         # The first effort at field detection just extracts fields, with no value cleanup
         parser = parsers.TupleLineParser(delimiter=delimiter)
 
@@ -292,6 +294,8 @@ def guess_gwas_generic(filename: ty.Union[ty.Iterable, str], *,
 
         # Configure a reader and parser based on the auto-detected file options, plus any explicit argument overrides
         options = {**p_config, **position_config, **(beta_config or {}), **(parser_options or {})}
+
+        print(options)
 
         parser = parsers.GenericGwasLineParser(**options)
 

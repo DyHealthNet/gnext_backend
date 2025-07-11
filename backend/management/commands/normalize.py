@@ -8,6 +8,7 @@ import os
 from backend.utils.preprocessing.zorp.zorp import sniffers
 from backend.utils.preprocessing.zorp.zorp import parsers
 from django.conf import settings
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 logger = logging.getLogger("backend")
 
@@ -41,27 +42,35 @@ class Command(BaseCommand):
             "alt_col": int(config("ALT_COLUMN")),
             "pval_col": int(config("PVAL_COLUMN")),
             "is_neg_log_pvalue": True,
-            'beta': int(config("BETA_COLUMN")),
-            'stderr_beta': int(config("SE_COLUMN")),
-            'alt_allele_freq': int(config("AF_COLUMN")),
+            'beta_col': int(config("BETA_COLUMN")),
+            'stderr_beta_col': int(config("SE_COLUMN")),
+            'allele_freq_col': int(config("AF_COLUMN")),
             'rsid': None
         }
 
         # Normalize GWAS files
-        for i, r in pheno_dt.iterrows():
-            in_filepath = os.path.join(GWAS_dir, r['filename'])
-            norm_filepath = os.path.join(GWAS_norm_dir, r['filename'].split(".")[0])
-            # Check if normalized file already exists
-            if os.path.exists(norm_filepath + ".gz"):
-                logger.info("Skipping normalization for %s, file already exists.", norm_filepath)
-                continue
-            else:
-                # Normalize GWAS file
-                parser = parsers.GenericGwasLineParser(**parser_options)
-                reader = sniffers.guess_gwas_generic(in_filepath, parser=parser, skip_errors=True)
-                columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta', 'alt_allele_freq']
-                reader.write(norm_filepath, make_tabix=True, columns=columns)
-                logger.info("COMPLETED: Normalization of GWAS file: %s", norm_filepath)
+        with ProcessPoolExecutor(max_workers=int(config("MAX_WORKERS"))) as executor:
+            futures = [
+                executor.submit(Command.process_and_normalize, r, GWAS_dir, GWAS_norm_dir, parser_options)
+                for i, r in pheno_dt.iterrows()
+            ]
+            for future in as_completed(futures):
+                filename = future.result()
 
+    @staticmethod
+    def process_and_normalize(r, GWAS_dir, GWAS_norm_dir, parser_options):
+        in_filepath = os.path.join(GWAS_dir, r['filename'])
+        norm_filepath = os.path.join(GWAS_norm_dir, r['filename'].split(".")[0])
 
+        if os.path.exists(norm_filepath + ".gz"):
+            logger.info("Skipping normalization for %s, file already exists.", norm_filepath)
+            return r['filename']
+
+        parser = parsers.GenericGwasLineParser(**parser_options)
+        reader = sniffers.guess_gwas_generic(in_filepath, parser=parser, skip_errors=True)
+        columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta',
+                   'alt_allele_freq']
+        reader.write(norm_filepath, make_tabix=True, columns=columns)
+        logger.info("COMPLETED: Normalization of GWAS file: %s", r['filename'])
+        return r['filename']
 

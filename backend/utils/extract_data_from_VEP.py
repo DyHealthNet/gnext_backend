@@ -4,11 +4,11 @@ from backend.utils.converters import convert_variant_id
 import gzip
 import logging
 import pandas as pd
-
+import os
 from backend.utils.VEP_consequences import VEP_RANK_DICT
+from django.conf import settings
 
 logger = logging.getLogger('backend')
-
 
 def get_most_severe(consequences):
     """
@@ -34,7 +34,7 @@ def get_most_severe(consequences):
 
 
 def extract_variant_annotation(variant_id):
-    vep_anno_file = config('VEP_ANNO_FILE')
+    vep_anno_file = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
 
     # Extract GWAS results of variant from phenotype file via tabix
     tabix_file = pysam.TabixFile(vep_anno_file)

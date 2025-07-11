@@ -125,6 +125,7 @@ def GenericGwasLineParser(
         both_markers = (_ref_col is None and _alt_col is None) or \
                        (_ref_col is not None and _alt_col is not None)
 
+
         is_valid = has_position and both_markers and (_pvalue_col is not None)
         if not is_valid:
             raise exceptions.ConfigurationException('GWAS parser must specify how to find all required fields')
@@ -160,6 +161,7 @@ def GenericGwasLineParser(
 
             chrom = chrom.upper()
 
+
             # Explicit columns will override a value from the marker, by design
             if _ref_col is not None:
                 ref = fields[_ref_col]
@@ -184,8 +186,11 @@ def GenericGwasLineParser(
                 elif not rsid.startswith('rs'):
                     rsid = 'rs' + rsid
 
+
             if _beta_col is not None:
                 beta = fields[_beta_col]
+
+
 
             if _stderr_col is not None:
                 stderr_beta = fields[_stderr_col]

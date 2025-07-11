@@ -11,6 +11,8 @@ import math
 import json
 import gzip
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 
 from backend.utils.preprocessing.snp_to_rsid_mapping import setup_rsid_mapping_lmdb, map_and_write_rsid
 from backend.utils.preprocessing.locuszoom import manhattan, qq
@@ -53,52 +55,73 @@ class Command(BaseCommand):
 
         # Importing phenotypes
         pheno_dt = pd.read_csv(pheno_file)
-        i = 0
 
         # Normalize GWAS files
-        for i, r in pheno_dt.iterrows():
+        with ProcessPoolExecutor(max_workers=int(config("MAX_WORKERS"))) as executor:
+            futures = [
+                executor.submit(
+                    Command.process_gwas_row,
+                    r,
+                    GWAS_manhattan_dir,
+                    GWAS_qq_dir,
+                    GWAS_norm_dir,
+                    GWAS_magma_norm_dir,
+                    lmdb_path
+                )
+                for i, r in pheno_dt.iterrows()
+            ]
+            for future in as_completed(futures):
+                filename = future.result()
+                logger.info(f"COMPLETED: Generated input file: %s", filename)
 
-            # Check if the Manhattan file already exists -> if yes, no need to process file again
-            manhattan_filepath = os.path.join(GWAS_manhattan_dir, r['filename'].split(".")[0] + "_manhattan.json")
-            qq_filepath = os.path.join(GWAS_qq_dir, r['filename'].split(".")[0] + "_qq.json")
-            norm_filepath = os.path.join(GWAS_norm_dir, r['filename'].split(".")[0] + ".gz") # TODO change bach to only r['filename'] or safer this way?
-            norm_with_rsid_filepath = norm_filepath.replace('.gz', '_rsid.gz')
-            magma_filepath = os.path.join(GWAS_magma_norm_dir, r['filename'].split(".")[0] + ".txt")
+    @staticmethod
+    def process_gwas_row(pheno, GWAS_manhattan_dir, GWAS_qq_dir, GWAS_norm_dir, GWAS_magma_norm_dir, lmdb_path):
+        import logging
+        logger = logging.getLogger("backend")
 
-            # Update normalized GWAS files with rsID
-            if not os.path.exists(norm_with_rsid_filepath):
-                logger.info("Started Adding rsid to GWAS file: %s", norm_filepath)
-                map_and_write_rsid(norm_filepath, lmdb_path) # TODO check if files already contain rsID? -> No we still wanna create our own
-                logger.debug("COMPLETED: Added rsid to GWAS file: %s", norm_filepath)
-            else:
-                logger.debug("Skipping generation. GWAS file with rsid already exists: %s", norm_with_rsid_filepath)
+        filename_base = pheno['filename'].split(".")[0]
+        manhattan_filepath = os.path.join(GWAS_manhattan_dir, filename_base + "_manhattan.json")
+        qq_filepath = os.path.join(GWAS_qq_dir, filename_base + "_qq.json")
+        norm_filepath = os.path.join(GWAS_norm_dir, filename_base + ".gz")
+        norm_with_rsid_filepath = norm_filepath.replace('.gz', '_rsid.gz')
+        magma_filepath = os.path.join(GWAS_magma_norm_dir, filename_base + ".txt")
 
-            # Generate Manhattan JSON file
-            if not os.path.exists(manhattan_filepath):
-                logger.info("Started Manhattan JSON file generation of GWAS file: %s", norm_filepath)
-                reader_for_manhattan = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
-                Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
-                logger.debug("COMPLETED: Manhattan JSON file generation of GWAS file: %s", norm_filepath)
-            else:
-                logger.debug("Skipping generation. Manhattan JSON file already exists: %s", manhattan_filepath)
+        # Update normalized GWAS files with rsID
+        if not os.path.exists(norm_with_rsid_filepath):
+            logger.info("Started adding rsid to GWAS file: %s", norm_filepath)
+            map_and_write_rsid(norm_filepath, lmdb_path)
+            logger.info("COMPLETED: Added rsid to GWAS file: %s", norm_with_rsid_filepath)
+        else:
+            logger.info("Skipping generation. GWAS file with rsid already exists: %s", norm_with_rsid_filepath)
 
-            # Generate QQ JSON file
-            if not os.path.exists(qq_filepath):
-                logger.info("Startet QQ JSON file generation of GWAS file: %s", norm_filepath)
-                reader_for_qq = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
-                Command.generate_qq(reader_for_qq, qq_filepath)
-                logger.debug("COMPLETED: QQ JSON file generation of GWAS file: %s", norm_filepath)
-            else:
-                logger.debug("Skipping generation. QQ JSON file already exists: %s", qq_filepath)
+        # Manhattan
+        if not os.path.exists(manhattan_filepath):
+            logger.info("Started Manhattan JSON file generation of GWAS file: %s", norm_filepath)
+            reader_for_manhattan = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+            Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
+            logger.info("COMPLETED: Manhattan JSON file generation of GWAS file: %s", norm_filepath)
+        else:
+            logger.info("Skipping generation. Manhattan JSON file already exists: %s", manhattan_filepath)
 
-            # Generate MAGMA input file
-            if not os.path.exists(magma_filepath):
-                logger.info("Started MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
-                reader_for_magma = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
-                Command.generate_magma_input(reader_for_magma, magma_filepath, lmdb_path)
-                logger.debug("COMPLETED: MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
-            else:
-                logger.debug("Skipping generation. Magma input file already exists: %s", magma_filepath)
+        # QQ
+        if not os.path.exists(qq_filepath):
+            logger.info("Startet QQ JSON file generation of GWAS file: %s", norm_filepath)
+            reader_for_qq = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+            Command.generate_qq(reader_for_qq, qq_filepath)
+            logger.info("COMPLETED: QQ JSON file generation of GWAS file: %s", norm_filepath)
+        else:
+            logger.info("Skipping generation. QQ JSON file already exists: %s", qq_filepath)
+
+        # MAGMA
+        if not os.path.exists(magma_filepath):
+            logger.info("Started MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
+            reader_for_magma = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+            Command.generate_magma_input(reader_for_magma, magma_filepath, lmdb_path)
+            logger.info("COMPLETED: MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
+        else:
+            logger.info("Skipping generation. Magma input file already exists: %s", magma_filepath)
+
+        return pheno['filename']
 
     @staticmethod
     def generate_manhattan(reader, out_filename: str) -> bool:
@@ -159,6 +182,7 @@ class Command(BaseCommand):
             json.dump(rv, f)
         return True
 
+    @staticmethod
     def generate_magma_input(reader, out_filename, lmdb_path):
         start_time = time.time()
         # TODO Fix that rsid is not read in and then remove the rsid mapping here
@@ -170,7 +194,8 @@ class Command(BaseCommand):
         elapsed_time = end_time - start_time
         logger.debug(f"Time taken to normalize the GWAS stats file for Magma: {elapsed_time:.2f} seconds")
 
-    def prepare_MAGMA_mapping_input(self):
+    @staticmethod
+    def prepare_MAGMA_mapping_input():
 
         GWAS_annotated_vcf_file = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
 
@@ -184,7 +209,7 @@ class Command(BaseCommand):
             without_gene_terms = ["regulatory_region_variant", "TF_binding_site_variant", "intergenic_variant",
                                   "intron_variant"]
 
-            csq_fields = self.extract_csq_fields(GWAS_annotated_vcf_file)
+            csq_fields = Command.extract_csq_fields(GWAS_annotated_vcf_file)
 
             window_size_up = config("MAGMA_WINDOW_UP")
             window_size_down = config("MAGMA_WINDOW_DOWN")
@@ -235,7 +260,8 @@ class Command(BaseCommand):
                 for gene, rsids in gene_to_rsids.items():
                     f.write(f"{gene}\t1:1:2\t{' '.join(rsids)}\n")
 
-    def extract_csq_fields(self, vcf_path):
+    @staticmethod
+    def extract_csq_fields(vcf_path):
         """
         Extracts the CSQ field names from a VCF file.
         """
@@ -247,3 +273,4 @@ class Command(BaseCommand):
                     parts[-1] = parts[-1].strip('">')
                     return parts
         raise ValueError("No CSQ format found.")
+

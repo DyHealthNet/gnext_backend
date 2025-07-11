@@ -6,17 +6,18 @@ import gzip
 from backend.utils.converters import convert_variant_id
 from django.conf import settings
 import os
+import logging
+
+logger = logging.getLogger('backend')
 
 def extract_GWAS_results_for_variant_and_phenotype(filename, phenocode, pheno_category, pheno_label, variant_id):
     # Extract GWAS results of variant from phenotype file via tabix
-    filename = os.path.join(settings.GWAS_NORM_DIR,filename + ".gz")
-
+    filename = os.path.join(settings.GWAS_NORM_DIR, filename.split(".")[0] + ".gz")
     tabix_file = pysam.TabixFile(filename)
     # Get variant information
     chr, pos, ref, alt = convert_variant_id(variant_id)
 
     columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta', 'alt_allele_freq']
-
     try:
         for row in tabix_file.fetch(chr, pos-1, pos):
             row = row.split("\t")
@@ -26,10 +27,10 @@ def extract_GWAS_results_for_variant_and_phenotype(filename, phenocode, pheno_ca
                 return {"id": phenocode,
                         "trait_group": pheno_category,
                         "trait_label": pheno_label,
-                        "log_pvalue": float(row["pvalue"]),
-                        "se": float(row["stderr_beta"]),
-                        "beta": float(row["beta"]),
-                        "af": float(row["alt_allele_freq"])
+                        "log_pvalue": float(row["pvalue"]) if row["pvalue"] != "." else None,
+                        "se": float(row["stderr_beta"]) if row["stderr_beta"] != "." else None,
+                        "beta": float(row["beta"]) if row["beta"] != "." else None,
+                        "af": float(row["alt_allele_freq"]) if row["alt_allele_freq"] != "." else None,
                         }
 
     except Exception as e:
