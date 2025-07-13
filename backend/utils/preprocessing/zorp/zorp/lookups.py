@@ -23,7 +23,14 @@ class SnpToRsid:
                 record_type += '_test'
             path_or_build = assets.manager.locate(record_type, genome_build=path_or_build)
 
-        self.env = lmdb.open(path_or_build, subdir=False, max_dbs=num_chroms, readonly=True)
+        self.env = lmdb.open(path_or_build,
+            readonly=True,
+            lock=False,
+            max_dbs=num_chroms,
+            readahead=True,  # preload into memory
+            subdir = False,
+            map_size=1024 ** 4
+        )
         self.db_handles = {}  # type: dict
 
         self._known_chroms = None  # type: set

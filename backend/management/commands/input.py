@@ -50,7 +50,6 @@ class Command(BaseCommand):
         os.makedirs(GWAS_magma_norm_dir, exist_ok=True)
 
         GWAS_annotated_vcf_file =os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
-        # TODO check if files already contain rsID?
         lmdb_path = setup_rsid_mapping_lmdb(GWAS_annotated_vcf_file, GWAS_magma_dir)
 
         # Importing phenotypes
