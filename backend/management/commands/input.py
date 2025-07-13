@@ -115,7 +115,7 @@ class Command(BaseCommand):
         # MAGMA
         if not os.path.exists(magma_filepath):
             logger.info("Started MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
-            reader_for_magma = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+            reader_for_magma = sniffers.guess_gwas_standard(norm_with_rsid_filepath).add_filter('neg_log_pvalue')
             Command.generate_magma_input(reader_for_magma, magma_filepath, lmdb_path)
             logger.info("COMPLETED: MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
         else:
@@ -185,10 +185,6 @@ class Command(BaseCommand):
     @staticmethod
     def generate_magma_input(reader, out_filename, lmdb_path):
         start_time = time.time()
-        # TODO Fix that rsid is not read in and then remove the rsid mapping here
-        build = lmdb_path + "/data.mdb"
-        rsid_finder = lookups.SnpToRsid(build, test=False)
-        reader.add_lookup('rsid', lambda variant: rsid_finder(variant.chrom, variant.pos, variant.ref, variant.alt))
         reader.write(out_filename, columns=["rsid", "pval"], make_tabix=False)
         end_time = time.time()
         elapsed_time = end_time - start_time

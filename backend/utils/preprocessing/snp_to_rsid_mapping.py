@@ -37,6 +37,12 @@ def add_rsid_to_gwas_stats(reader, output_path, genome_build='GRCh37', debug_mod
     columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta',
                'alt_allele_freq']
 
+    i = 1
+    for variant in reader:
+        i+=1
+        if i > 1:
+            break
+
     # Build new output filename with _rsid suffix (.gz is not needed as write(...,make_tabix=True) will add that autom.)
     new_output_path = output_path.replace(".gz", "_rsid")
     if not os.path.exists(new_output_path + ".gz"):
@@ -74,6 +80,8 @@ def build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, num_chroms=25, map_size=10 
     db_handles = {}
 
     vcf = pysam.VariantFile(vcf_path)
+    csq_header = vcf.header.info["CSQ"].description.split("Format: ")[1].split("|")
+    rsid_index = csq_header.index("Existing_variation")
 
     with env.begin(write=True) as txn:
         for rec in vcf.fetch():
@@ -98,14 +106,18 @@ def build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, num_chroms=25, map_size=10 
                 rsid = None
                 if csq_list:
                     for csq_entry in csq_list:
-                        annotations = re.split(r'[,&]', csq_entry)
-                        for annot in annotations:
-                            fields = annot.split('|')
-                            if len(fields) > 17:
-                                candidate = fields[17] #TODO dynamically pull rsid column
-                                if candidate.startswith('rs'):
-                                    rsid = candidate
-                                    break
+                        fields = csq_entry.split('|')
+                        if len(fields) <= rsid_index:
+                            continue  # avoid index errors
+
+                        # Get the Existing_variation field
+                        candidate_field = fields[rsid_index]
+
+                        # Split the candidate field on '&' to find valid rsIDs
+                        for candidate in candidate_field.split('&'):
+                            if candidate.startswith('rs') and candidate[2:].isdigit():
+                                rsid = candidate
+                                break
                         if rsid:
                             break
 
