@@ -28,7 +28,7 @@ class SnpToRsid:
             lock=False,
             max_dbs=num_chroms,
             readahead=True,  # preload into memory
-            subdir = False,
+            subdir=False,
             map_size=1024 ** 4
         )
         self.db_handles = {}  # type: dict
