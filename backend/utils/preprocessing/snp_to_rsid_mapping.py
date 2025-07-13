@@ -67,16 +67,17 @@ def setup_rsid_mapping_lmdb(vcf_path, magma_dir, num_chroms=25, map_size=10 ** 9
     if not os.path.isdir(lmdb_path) or not os.path.exists(os.path.join(lmdb_path, "data.mdb")):
         logger.info("LMDB not found, creating...")
         start_time = time.time()
-        build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, map_size=10 * 1024 ** 3) #TODO check how to automatically set map size accoring to the umber of SNPs/ rows in vcf
+        build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path)
         end_time = time.time()
         logger.debug(f"Time taken to produce LMDB mapping lib: {end_time - start_time:.2f} seconds")
     else:
         logger.info("LMDB already exists, skipping creation.")
     return lmdb_path
 
-def build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, num_chroms=25, map_size=10 ** 9):
-    # Time taken to produce Lmdb mapping lib: 529.44 seconds
-    env = lmdb.open(lmdb_path, map_size=map_size, max_dbs=num_chroms)
+def build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, num_chroms=25):
+    # Time taken to produce Lmdb mapping lib: 529.44 seconds/ 479.51 seconds
+    # map_size is the maximum amount of data LMDB can store in this database., 1024 ** 4=1TB is a common upper limit
+    env = lmdb.open(lmdb_path, map_size=1024 ** 4, max_dbs=num_chroms)
     db_handles = {}
 
     vcf = pysam.VariantFile(vcf_path)

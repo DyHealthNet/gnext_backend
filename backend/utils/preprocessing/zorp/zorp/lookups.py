@@ -1,6 +1,7 @@
 """
 Convert SNP information to gene, rsid, or other useful annotations
 """
+import os
 import struct
 import typing as ty
 
@@ -23,13 +24,16 @@ class SnpToRsid:
                 record_type += '_test'
             path_or_build = assets.manager.locate(record_type, genome_build=path_or_build)
 
+        db_size = os.path.getsize(path_or_build)
+        map_size = int(db_size * 1.1)  # 10% buffer
+
         self.env = lmdb.open(path_or_build,
             readonly=True,
             lock=False,
             max_dbs=num_chroms,
             readahead=True,  # preload into memory
             subdir = False,
-            map_size=1024 ** 4
+            map_size=map_size
         )
         self.db_handles = {}  # type: dict
 
