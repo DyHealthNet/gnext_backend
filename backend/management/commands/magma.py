@@ -16,6 +16,9 @@ logger = logging.getLogger("backend")
 class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
+           if settings.MAGMA_ENABLED:
+               logger.debug("Magma is disabled.")
+               return
            logger.info("Starting MAGMA execution of GWAS summary statistics files.")
            self.run_MAGMA()
            logger.info("Finished MAGMA execution of GWAS summary statistics files!")
