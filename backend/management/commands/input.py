@@ -48,7 +48,7 @@ class Command(BaseCommand):
         GWAS_annotated_vcf_file = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
         lmdb_path = setup_rsid_mapping_lmdb(GWAS_annotated_vcf_file, GWAS_norm_dir)
 
-        if not settings.MAGMA_ENABLED:
+        if settings.MAGMA_ENABLED:
             GWAS_magma_dir = settings.GWAS_MAGMA_DIR
             os.makedirs(GWAS_magma_dir, exist_ok=True)
             GWAS_magma_norm_dir = os.path.join(GWAS_magma_dir, "input_GWAS_norm")
