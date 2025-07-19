@@ -28,7 +28,7 @@ class Command(BaseCommand):
            logger.info("Starting generation of Manhattan, QQ%s." % (" and MAGMA input files" if settings.MAGMA_ENABLED else " files"))
            self.generate_manhattan_qq_magma_files()
            if settings.MAGMA_ENABLED:
-               self.prepare_MAGMA_mapping_input()
+                  self.prepare_MAGMA_mapping_input()
            logger.info("Finished generation of Manhattan, QQ%s!" % (" and MAGMA input files" if settings.MAGMA_ENABLED else " files"))
        except Exception as e:
            # print stack trace
