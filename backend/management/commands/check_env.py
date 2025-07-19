@@ -87,8 +87,7 @@ class Command(BaseCommand):
                     raise CommandError(f"Invalid genome build: {value}. Expected 'GRCh37' or 'GRCh38'.")
 
             if key == "MAGMA_MODEL":
-                if (key not in ["snp-wise=mean", "snp-wise=top", "multi", "multi=snp-wise", "snp-wise=multi"] and
-                        not is_valid_snpwise_top(key)):
+                if key not in ["snp-wise=mean", "snp-wise=top", "multi", "multi=snp-wise", "snp-wise=multi"] and not is_valid_snpwise_top(key):
                     raise CommandError(f"MAGMA_MODEL must be a valid Magma model.")
 
         if missing:
