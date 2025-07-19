@@ -1,5 +1,3 @@
-from decouple import config
-
 def get_bool(value):
     val = value.strip().lower()
     true_values = {"true", "1", "yes", "on"}
