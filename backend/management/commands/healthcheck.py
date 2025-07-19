@@ -54,9 +54,9 @@ class Command(BaseCommand):
             norm_filepath = os.path.join(settings.GWAS_NORM_DIR, r['filename'].split(".")[0] + ".gz")
             manhattan_filepath = os.path.join(settings.GWAS_MANHATTAN_DIR, r['filename'].split(".")[0] + "_manhattan.json")
             qq_filepath = os.path.join(settings.GWAS_QQ_DIR, r['filename'].split(".")[0] + "_qq.json")
-            if settings.MAGMA_ENABLED:
-                magma_input_filepath = os.path.join(os.path.join(settings.GWAS_MAGMA_DIR, "input_GWAS_norm"), r['filename'].split(".")[0] + ".txt")
-                magma_output_filepath = os.path.join(settings.GWAS_MAGMA_RESULT_DIR,  r['filename'].split(".")[0] + ".genes.out")
+                if settings.MAGMA_ENABLED:
+                    magma_input_filepath = os.path.join(os.path.join(settings.GWAS_MAGMA_DIR, "input_GWAS_norm"), r['filename'].split(".")[0] + ".txt")
+                    magma_output_filepath = os.path.join(settings.GWAS_MAGMA_RESULT_DIR,  r['filename'].split(".")[0] + ".genes.out")
 
             check_file_exists(in_filepath, f"Input file for phenotype {r['phenocode']}")
             check_file_exists(norm_filepath, f"Normalized file for phenotype {r['phenocode']}")
