@@ -9,7 +9,6 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-from os import utime
 from pathlib import Path
 from decouple import config
 from backend.utils.preprocessing.magma.magma import get_bool
