@@ -7,6 +7,7 @@ import subprocess
 from decouple import config
 from django.conf import settings
 from django.core.management import CommandError
+from backend.utils.preprocessing.magma.magma import read_magma_config
 
 logger = logging.getLogger("backend")
 
@@ -41,12 +42,23 @@ class Command(BaseCommand):
             except subprocess.CalledProcessError as e:
                 raise CommandError(f"Failed to generate full VCF file: {e}")
 
-        # Run VEP annotation
-        if os.path.exists(os.path.join(GWAS_vep_dir, GWAS_annotated_vcf_file)):
-            logger.info("Skipping VCF annotation, because annotated VCF file already exists.")
-        else:
-            try:
-                subprocess.run(["bash", "backend/utils/preprocessing/bash/run_vep.sh", GWAS_vcf_file, GWAS_annotated_vcf_file, GWAS_vep_dir, genome_build, str(window_up), str(window_down)], check=True)
-                logger.info("COMPLETED: Annotation of VCF file!")
-            except subprocess.CalledProcessError as e:
-                raise CommandError(f"Failed to run VEP: {e}")
+        #TODO Lisi check this please
+        mconfig_rows = read_magma_config(config("MAGMA_CONFIG_FILE"))
+
+        for row in mconfig_rows: # TODO use parallel processing
+            mapping_strategy = (row.get("mapping_strategy") or "").lower()
+            if mapping_strategy.lower().strip() != "positional":
+                return
+            curr_window_up = row.get("window_up")
+            curr_window_down = row.get("window_down")
+            curr_GWAS_annotated_vcf_file = f"{curr_window_up}up_{curr_window_down}down_{GWAS_annotated_vcf_file}"
+
+            # Run VEP annotation
+            if os.path.exists(os.path.join(GWAS_vep_dir, curr_GWAS_annotated_vcf_file)):
+                logger.info("Skipping VCF annotation, because annotated VCF file already exists.")
+            else:
+                try:
+                    subprocess.run(["bash", "backend/utils/preprocessing/bash/run_vep.sh", GWAS_vcf_file, curr_GWAS_annotated_vcf_file, GWAS_vep_dir, genome_build, str(curr_window_up), str(curr_window_down)], check=True)
+                    logger.info("COMPLETED: Annotation of VCF file!")
+                except subprocess.CalledProcessError as e:
+                    raise CommandError(f"Failed to run VEP: {e}")
