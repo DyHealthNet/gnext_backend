@@ -10,6 +10,7 @@ from decouple import config
 import math
 import json
 import gzip
+import re
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -84,10 +85,11 @@ class Command(BaseCommand):
         import logging
         logger = logging.getLogger("backend")
 
-        filename_base = pheno['filename'].split(".")[0]
-        manhattan_filepath = os.path.join(GWAS_manhattan_dir, filename_base + "_manhattan.json")
-        qq_filepath = os.path.join(GWAS_qq_dir, filename_base + "_qq.json")
-        norm_filepath = os.path.join(GWAS_norm_dir, filename_base + ".gz")
+        norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(pheno['filename']))
+
+        manhattan_filepath = os.path.join(GWAS_manhattan_dir, norm_filename + "_manhattan.json")
+        qq_filepath = os.path.join(GWAS_qq_dir, norm_filename + "_qq.json")
+        norm_filepath = os.path.join(GWAS_norm_dir, norm_filename + ".gz")
         norm_with_rsid_filepath = norm_filepath.replace('.gz', '_rsid.gz')
 
         #TODO: Completed message also occurs when there was an error, change that

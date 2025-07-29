@@ -10,6 +10,7 @@ import pandas as pd
 from django.conf import settings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from backend.utils.preprocessing.magma.magma import read_magma_config, sanitize_filename
+import re
 
 logger = logging.getLogger("backend")
 
@@ -80,9 +81,10 @@ class Command(BaseCommand):
     def process_magma_run(pheno, GWAS_magma_norm_dir, GWAS_magma_result_dir, magma, LD_path, gene_annot, n_samples, magma_model):
         import logging
         logger = logging.getLogger("backend")
+        norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(pheno['filename']))
 
-        sample_file = os.path.join(GWAS_magma_norm_dir,  pheno['filename'].split(".")[0] + ".txt")
-        magma_file = os.path.join(GWAS_magma_result_dir,  pheno['filename'].split(".")[0] + "_" + sanitize_filename(magma_model))
+        sample_file = os.path.join(GWAS_magma_norm_dir,  norm_filename + ".txt")
+        magma_file = os.path.join(GWAS_magma_result_dir,  norm_filename + "_" + sanitize_filename(magma_model))
 
         if not os.path.exists(magma_file + ".genes.out"):
 

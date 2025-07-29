@@ -9,6 +9,7 @@ from backend.utils.preprocessing.zorp.zorp import sniffers
 from backend.utils.preprocessing.zorp.zorp import parsers
 from django.conf import settings
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import re
 
 logger = logging.getLogger("backend")
 
@@ -60,7 +61,8 @@ class Command(BaseCommand):
     @staticmethod
     def process_and_normalize(r, GWAS_dir, GWAS_norm_dir, parser_options):
         in_filepath = os.path.join(GWAS_dir, r['filename'])
-        norm_filepath = os.path.join(GWAS_norm_dir, r['filename'].split(".")[0])
+        norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(r['filename']))
+        norm_filepath = os.path.join(GWAS_norm_dir, norm_filename)
 
         if os.path.exists(norm_filepath + ".gz"):
             logger.info("Skipping normalization for %s, file already exists.", norm_filepath)
