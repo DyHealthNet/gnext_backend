@@ -90,7 +90,7 @@ class Command(BaseCommand):
         norm_filepath = os.path.join(GWAS_norm_dir, filename_base + ".gz")
         norm_with_rsid_filepath = norm_filepath.replace('.gz', '_rsid.gz')
 
-        #TODO: Completed message also occures when there was an error, change that
+        #TODO: Completed message also occurs when there was an error, change that
 
         # Update normalized GWAS files with rsID
         if not os.path.exists(norm_with_rsid_filepath):
