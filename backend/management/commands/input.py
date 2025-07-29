@@ -90,7 +90,7 @@ class Command(BaseCommand):
         norm_filepath = os.path.join(GWAS_norm_dir, filename_base + ".gz")
         norm_with_rsid_filepath = norm_filepath.replace('.gz', '_rsid.gz')
 
-        #TODO: Completed message also occures when there was an error, change that
+        #TODO: Completed message also occurs when there was an error, change that
 
         # Update normalized GWAS files with rsID
         if not os.path.exists(norm_with_rsid_filepath):
@@ -208,7 +208,7 @@ class Command(BaseCommand):
 
         for row in mconfig_rows:  # TODO use parallel processing
             mapping_strategy = (row.get("mapping_strategy") or "").lower()
-            if mapping_strategy.lower().strip() != "positional":
+            if mapping_strategy.strip() != "positional":
                 return  # TODO adapt here depending on mapping strategy
 
             curr_window_up = row.get("window_up")
