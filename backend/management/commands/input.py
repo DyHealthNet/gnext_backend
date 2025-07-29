@@ -272,7 +272,7 @@ class Command(BaseCommand):
                                     distance_int = int(distance)
                                 except (ValueError, TypeError):
                                     continue
-                                if "upstream_gene_variant" in consequences and curr_window_up!=0 and distance_int <= curr_window_up:
+                                if "upstream_gene_variant" in consequences and curr_window_up != 0 and distance_int <= curr_window_up:
                                     gene_to_rsids[gene].add(rsid)
                                 elif "downstream_gene_variant" in consequences and curr_window_down!=0 and distance_int <= curr_window_down:
                                     gene_to_rsids[gene].add(rsid)
