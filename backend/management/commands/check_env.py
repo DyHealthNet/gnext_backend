@@ -7,6 +7,8 @@ from django.core.management import CommandError
 from decouple import UndefinedValueError
 import pandas as pd
 
+from pheweb_backend.settings import MAGMA_ENABLED
+
 logger = logging.getLogger("backend")
 
 
@@ -93,6 +95,11 @@ class Command(BaseCommand):
         # Check if all required columns in pheno_file are present
         # TODO: Lisi
 
+        # Check if output directory set, if so, check if it exists
+        output_dir = config("OUTPUT_DIR", default=config("GWAS_DIR"))
+        if not os.path.isdir(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+
         # Check if all GWAS stats files are in the GWAS_DIR
         GWAS_dir = config("GWAS_DIR")
         pheno_file = config("PHENO_FILE")
@@ -107,8 +114,7 @@ class Command(BaseCommand):
 
         logger.info("All GWAS summary statistics files are present.")
 
-        mconfig_rows = read_magma_config(config("MAGMA_CONFIG_FILE"))
-        logger.info("MAGMA config file is valid.")
+        if MAGMA_ENABLED:
+            mconfig_rows = read_magma_config(config("MAGMA_CONFIG_FILE"))
+            logger.info("MAGMA config file is valid.")
 
-
-# Removed the unused and duplicate function is_valid_snpwise_top.
