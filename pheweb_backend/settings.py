@@ -150,7 +150,7 @@ TYPESENSE_CONFIG = {
 
 # Configuration parameters
 GWAS_DIR = config("GWAS_DIR")
-OUTPUT_DIR = config("OUTPUT_DIR", default = GWAS_DIR)
+OUTPUT_DIR = config("OUTPUT_DIR", default=GWAS_DIR)
 GWAS_NORM_DIR = os.path.join(OUTPUT_DIR, "GWAS_stats_norm")
 GWAS_MANHATTAN_DIR = os.path.join(OUTPUT_DIR, "GWAS_manhattan")
 GWAS_QQ_DIR = os.path.join(OUTPUT_DIR, "GWAS_qq")
