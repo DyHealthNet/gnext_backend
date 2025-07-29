@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from backend.utils.preprocessing.magma.magma import get_bool
+from backend.utils.preprocessing.magma.magma import get_bool, read_magma_config
 import logging
 from decouple import config
 import os
@@ -34,8 +34,6 @@ class Command(BaseCommand):
             "PVAL_NEGLOG10",
             "BATCH_SIZE",
             "MAGMA_ENABLED", # Can be omitted as it's individually tested in the next step
-            "MAGMA_WINDOW_UP", # Is this still needed ehen MAGMA disabled? Yes because of vcf annotate right?
-            "MAGMA_WINDOW_DOWN",
         ]
 
         missing = []
@@ -48,7 +46,7 @@ class Command(BaseCommand):
             if magma_enabled:
                 required_keys += [
                     "MAGMA_LD_REF",
-                    "MAGMA_MODEL",  # Or set a default here?
+                    "MAGMA_CONFIG_FILE",
                     "N_SAMPLES"
                 ]
             else:
@@ -59,7 +57,7 @@ class Command(BaseCommand):
 
 
 
-        file_checks = {"PHENO_FILE":"file", "GWAS_DIR":"dir", "MAGMA_LD_REF":"dir"}
+        file_checks = {"PHENO_FILE":"file", "GWAS_DIR":"dir", "MAGMA_LD_REF":"dir", "MAGMA_CONFIG_FILE":"file"}
         for key in required_keys:
             try:
                 value = config(key)
@@ -86,10 +84,6 @@ class Command(BaseCommand):
                 if value not in ["GRCh37", "GRCh38"]:
                     raise CommandError(f"Invalid genome build: {value}. Expected 'GRCh37' or 'GRCh38'.")
 
-            if key == "MAGMA_MODEL":
-                if key not in ["snp-wise=mean", "snp-wise=top", "multi", "multi=snp-wise", "snp-wise=multi"] and not is_valid_snpwise_top(key):
-                    raise CommandError(f"MAGMA_MODEL must be a valid Magma model.")
-
         if missing:
             raise CommandError(f"Missing environment variables: {', '.join(missing)}")
         else:
@@ -113,12 +107,8 @@ class Command(BaseCommand):
 
         logger.info("All GWAS summary statistics files are present.")
 
+        mconfig_rows = read_magma_config(config("MAGMA_CONFIG_FILE"))
+        logger.info("MAGMA config file is valid.")
 
-def is_valid_snpwise_top(key: str) -> bool:
-    if not key.startswith("snp-wise=top,"):
-        return False
-    value = key.split("snp-wise=top,")[1]
-    if value.isdigit() and int(value) > 0:
-        return True
-    float_val = float(value)
-    return 0.0 < float_val <= 1.0
+
+# Removed the unused and duplicate function is_valid_snpwise_top.

@@ -17,6 +17,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from backend.utils.preprocessing.snp_to_rsid_mapping import setup_rsid_mapping_lmdb, map_and_write_rsid
 from backend.utils.preprocessing.locuszoom import manhattan, qq
 from backend.utils.preprocessing.zorp.zorp import parsers, sniffers, readers, lookups
+from backend.utils.preprocessing.magma.magma import read_magma_config
 from django.conf import settings
 
 
@@ -197,69 +198,81 @@ class Command(BaseCommand):
 
     @staticmethod
     def prepare_MAGMA_mapping_input():
+        mconfig_rows = read_magma_config(config("MAGMA_CONFIG_FILE"))
 
-        GWAS_annotated_vcf_file = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
-
+        GWAS_annotated_vcf_file = settings.GWAS_ANNO_VCF_FILE
         GWAS_magma_dir = settings.GWAS_MAGMA_DIR
-        os.makedirs(GWAS_magma_dir, exist_ok=True)
-        GWAS_anno_magma_file = os.path.join(GWAS_magma_dir, settings.GWAS_ANNO_MAGMA_FILE)
-        # TODO if file of present has the correct window sizes in the header lines -> if not overwrite
-        if not os.path.exists(GWAS_anno_magma_file):
-            logger.info(f"Starting to create a SNP to gene annotation file for Magma...")
 
-            without_gene_terms = ["regulatory_region_variant", "TF_binding_site_variant", "intergenic_variant",
-                                  "intron_variant"]
+        for row in mconfig_rows:  # TODO use parallel processing
+            mapping_strategy = (row.get("mapping_strategy") or "").lower()
+            if mapping_strategy.strip() != "positional":
+                return  # TODO adapt here depending on mapping strategy
 
-            csq_fields = Command.extract_csq_fields(GWAS_annotated_vcf_file)
+            curr_window_up = row.get("window_up")
+            curr_window_down = row.get("window_down")
+            curr_GWAS_annotated_vcf_file = f"{curr_window_up}up_{curr_window_down}down_{GWAS_annotated_vcf_file}"
+            curr_GWAS_annotated_vcf_path = os.path.join(settings.GWAS_VEP_DIR, curr_GWAS_annotated_vcf_file)
 
-            window_size_up = config("MAGMA_WINDOW_UP")
-            window_size_down = config("MAGMA_WINDOW_DOWN")
+            curr_GWAS_magma_dir = os.path.join(GWAS_magma_dir, f"{settings.GWAS_MAGMA_DIR}_{mapping_strategy}_{curr_window_up}_{curr_window_down}")
+            os.makedirs(curr_GWAS_magma_dir, exist_ok=True)
 
-            gene_to_rsids = defaultdict(set)
+            GWAS_anno_magma_file = os.path.join(curr_GWAS_magma_dir, settings.GWAS_ANNO_MAGMA_FILE)
 
-            i = 1
-            with gzip.open(GWAS_annotated_vcf_file, 'rt') as f:
-                for line in f:
-                    if line.startswith('#'):
-                        continue
-                    parts = line.strip().split('\t')
-                    if len(parts) < 8:
-                        continue
-                    info = parts[7]
-                    if "CSQ=" not in info:
-                        continue
-                    csq_data = info.split("CSQ=")[1].split(";")[0]
-                    entries = csq_data.split(',')
-                    i += 1
-                    for entry in entries:
-                        values = entry.split('|')
-                        csq_dict = dict(zip(csq_fields, values))
+            # TODO if file of present has the correct window sizes in the header lines -> if not overwrite
+            if not os.path.exists(GWAS_anno_magma_file):
+                logger.info(f"Starting to create a SNP to gene annotation file for Magma...")
 
-                        if csq_dict.get("BIOTYPE") != "protein_coding" or csq_dict.get("Feature_type") != "Transcript":
+                without_gene_terms = ["regulatory_region_variant", "TF_binding_site_variant", "intergenic_variant",
+                                      "intron_variant"]
+
+                csq_fields = Command.extract_csq_fields(GWAS_annotated_vcf_file)
+
+                gene_to_rsids = defaultdict(set)
+
+
+                i = 1
+                with gzip.open(curr_GWAS_annotated_vcf_path, 'rt') as f:
+                    for line in f:
+                        if line.startswith('#'):
                             continue
-
-                        consequences = csq_dict.get("Consequence", "").split("&")
-                        gene = csq_dict.get("Gene")
-                        ids = csq_dict.get("Existing_variation", "").split("&")
-                        rsid = next((i for i in ids if i.startswith("rs")), None)
-
-                        if not gene or not rsid:
+                        parts = line.strip().split('\t')
+                        if len(parts) < 8:
                             continue
-
-                        # Check for consequences not in without_gene_terms
-                        if any(c not in without_gene_terms for c in consequences):
-                            gene_to_rsids[gene].add(rsid)
+                        info = parts[7]
+                        if "CSQ=" not in info:
                             continue
+                        csq_data = info.split("CSQ=")[1].split(";")[0]
+                        entries = csq_data.split(',')
+                        i += 1
+                        for entry in entries:
+                            values = entry.split('|')
+                            csq_dict = dict(zip(csq_fields, values))
 
-                    if i % 100000 == 0:
-                        logger.debug(f"Processed {i} lines from VCF file.")
+                            if csq_dict.get("BIOTYPE") != "protein_coding" or csq_dict.get("Feature_type") != "Transcript":
+                                continue
 
-            # Write MAGMA gene annotation file
-            with open(GWAS_anno_magma_file, 'w') as f:
-                f.write("# window_up = " + str(window_size_up) + "\n")
-                f.write("# window_down = " + str(window_size_down) + "\n")
-                for gene, rsids in gene_to_rsids.items():
-                    f.write(f"{gene}\t1:1:2\t{' '.join(rsids)}\n")
+                            consequences = csq_dict.get("Consequence", "").split("&")
+                            gene = csq_dict.get("Gene")
+                            ids = csq_dict.get("Existing_variation", "").split("&")
+                            rsid = next((i for i in ids if i.startswith("rs")), None)
+
+                            if not gene or not rsid:
+                                continue
+
+                            # Check for consequences not in without_gene_terms
+                            if any(c not in without_gene_terms for c in consequences):
+                                gene_to_rsids[gene].add(rsid)
+                                continue
+
+                        if i % 100000 == 0:
+                            logger.debug(f"Processed {i} lines from VCF file.")
+
+                # Write MAGMA gene annotation file
+                with open(GWAS_anno_magma_file, 'w') as f:
+                    f.write("# window_up = " + str(curr_window_up) + "\n")
+                    f.write("# window_down = " + str(curr_window_down) + "\n")
+                    for gene, rsids in gene_to_rsids.items():
+                        f.write(f"{gene}\t1:1:2\t{' '.join(rsids)}\n")
 
     @staticmethod
     def extract_csq_fields(vcf_path):
