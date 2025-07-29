@@ -268,14 +268,14 @@ class Command(BaseCommand):
                                     continue
                                 # If not check if variant falls in current window
                                 distance = csq_dict.get("DISTANCE")
-                                if not distance:
+                                try:
+                                    distance_int = int(distance)
+                                except (ValueError, TypeError):
                                     continue
-                                if "upstream_gene_variant" in consequences and distance and int(distance) <= curr_window_up:
+                                if "upstream_gene_variant" in consequences and curr_window_up!=0 and distance_int <= curr_window_up:
                                     gene_to_rsids[gene].add(rsid)
-                                elif "downstream_gene_variant" in consequences and distance and int(
-                                        distance) <= curr_window_down:
+                                elif "downstream_gene_variant" in consequences and curr_window_down!=0 and distance_int <= curr_window_down:
                                     gene_to_rsids[gene].add(rsid)
-                                continue
 
                         if i % 100000 == 0:
                             logger.debug(f"Processed {i} lines from VCF file.")
