@@ -54,15 +54,17 @@ class Command(BaseCommand):
             norm_filepath = os.path.join(settings.GWAS_NORM_DIR, r['filename'].split(".")[0] + ".gz")
             manhattan_filepath = os.path.join(settings.GWAS_MANHATTAN_DIR, r['filename'].split(".")[0] + "_manhattan.json")
             qq_filepath = os.path.join(settings.GWAS_QQ_DIR, r['filename'].split(".")[0] + "_qq.json")
-            magma_input_filepath = os.path.join(os.path.join(settings.GWAS_MAGMA_DIR, "input_GWAS_norm"), r['filename'].split(".")[0] + ".txt")
-            magma_output_filepath = os.path.join(settings.GWAS_MAGMA_RESULT_DIR,  r['filename'].split(".")[0] + ".genes.out")
+                if settings.MAGMA_ENABLED:
+                    magma_input_filepath = os.path.join(os.path.join(settings.GWAS_MAGMA_DIR, "input_GWAS_norm"), r['filename'].split(".")[0] + ".txt")
+                    magma_output_filepath = os.path.join(settings.GWAS_MAGMA_RESULT_DIR,  r['filename'].split(".")[0] + ".genes.out")
 
             check_file_exists(in_filepath, f"Input file for phenotype {r['phenocode']}")
             check_file_exists(norm_filepath, f"Normalized file for phenotype {r['phenocode']}")
             check_file_exists(manhattan_filepath, f"Manhattan plot file for phenotype {r['phenocode']}")
             check_file_exists(qq_filepath, f"QQ plot file for phenotype {r['phenocode']}")
-            check_file_exists(magma_input_filepath, f"MAGMA input file for phenotype {r['phenocode']}")
-            check_file_exists(magma_output_filepath, f"MAGMA output file for phenotype {r['phenocode']}")
+            if settings.MAGMA_ENABLED:
+                check_file_exists(magma_input_filepath, f"MAGMA input file for phenotype {r['phenocode']}")
+                check_file_exists(magma_output_filepath, f"MAGMA output file for phenotype {r['phenocode']}")
 
 
         logger.info("All phenotype-specific files are present.")
@@ -74,8 +76,9 @@ class Command(BaseCommand):
             raise CommandError(f"VEP annotation file does not exist: {settings.GWAS_ANNO_VCF_FILE}")
 
         # Check if MAGMA mapping file exists
-        #if not os.path.isfile(os.path.join(settings.GWAS_MAGMA_DIR, settings.GWAS_ANNO_MAGMA_FILE)):
-        #    raise CommandError(f"MAGMA mapping file does not exist: {settings.GWAS_ANNO_MAGMA_FILE}")
+        # if settings.MAGMA_ENABLED:
+        #     if not os.path.isfile(os.path.join(settings.GWAS_MAGMA_DIR, settings.GWAS_ANNO_MAGMA_FILE)):
+        #        raise CommandError(f"MAGMA mapping file does not exist: {settings.GWAS_ANNO_MAGMA_FILE}")
 
 
     @staticmethod

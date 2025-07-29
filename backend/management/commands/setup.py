@@ -20,14 +20,15 @@ logger = logging.getLogger("backend")
 class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
-           logger.info("Starting setup of VEP, Typesense, and MAGMA.")
+           logger.info("Starting setup of VEP%s." % (", Typesense and MAGMA" if settings.MAGMA_ENABLED else " and Typesense"))
            # Setup VEP -> check if docker pulled and cache installed
            self.setup_VEP()
            # Setup Typesense -> check if typesense running and if schema exists
            self.setup_typesense()
-           # Setup MAGMA -> check if executable downloaded
-           self.setup_magma()
-           logger.info("Finished setup of VEP, Typesense, and MAGMA!")
+           # Setup MAGMA -> check if executable downloaded if Magma is enabled
+           if settings.MAGMA_ENABLED:
+               self.setup_magma()
+           logger.info("Finished setup of VEP%s." % (", Typesense and MAGMA" if settings.MAGMA_ENABLED else " and Typesense"))
        except Exception as e:
            # print stack trace
            traceback.print_exc()

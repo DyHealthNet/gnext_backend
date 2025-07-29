@@ -9,9 +9,9 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
 from pathlib import Path
 from decouple import config
+from backend.utils.preprocessing.magma.magma import get_bool
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -156,6 +156,7 @@ GWAS_QQ_DIR = os.path.join(GWAS_DIR, "GWAS_qq")
 GWAS_VEP_DIR = os.path.join(GWAS_DIR, "GWAS_vep")
 GWAS_VCF_FILE = "full_variants.vcf"
 GWAS_ANNO_VCF_FILE = "annotated_full_variants.vcf.bgz"
+MAGMA_ENABLED = get_bool(config("MAGMA_ENABLED"))
 GWAS_MAGMA_DIR = os.path.join(GWAS_DIR, "GWAS_magma")
 GWAS_ANNO_MAGMA_FILE = "magma.genes.annot"
 GWAS_MAGMA_RESULT_DIR = os.path.join(GWAS_MAGMA_DIR, "MAGMA_results")

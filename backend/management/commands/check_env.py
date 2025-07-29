@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from backend.utils.preprocessing.magma.magma import get_bool
 import logging
 from decouple import config
 import os
@@ -32,13 +33,32 @@ class Command(BaseCommand):
             "AF_COLUMN",
             "PVAL_NEGLOG10",
             "BATCH_SIZE",
-            "MAGMA_WINDOW_UP",
+            "MAGMA_ENABLED", # Can be omitted as it's individually tested in the next step
+            "MAGMA_WINDOW_UP", # Is this still needed ehen MAGMA disabled? Yes because of vcf annotate right?
             "MAGMA_WINDOW_DOWN",
-            "MAGMA_LD_REF",
-            "MAGMA_MODEL" # Or set a default here?
         ]
 
         missing = []
+
+        try:
+            magma_enabled = get_bool(config("MAGMA_ENABLED"))
+            if magma_enabled == None:
+                raise CommandError(f"MAGMA_ENABLED must be set to either True/False, 1/0, yes/no or on/off")
+
+            if magma_enabled:
+                required_keys += [
+                    "MAGMA_LD_REF",
+                    "MAGMA_MODEL",  # Or set a default here?
+                    "N_SAMPLES"
+                ]
+            else:
+                logger.info(f"MAGMA is currently disabled. All MAGMA-related preprocessing steps will be skipped. "
+    f"To enable MAGMA analysis for your dataset, set MAGMA_ENABLED to True in your .env file.")
+        except UndefinedValueError:
+            missing.append("MAGMA_ENABLED")
+
+
+
         file_checks = {"PHENO_FILE":"file", "GWAS_DIR":"dir", "MAGMA_LD_REF":"dir"}
         for key in required_keys:
             try:
@@ -55,7 +75,8 @@ class Command(BaseCommand):
 
             if key in ["CHR_COLUMN", "POS_COLUMN", "REF_COLUMN", "ALT_COLUMN",
                        "PVAL_COLUMN", "SE_COLUMN", "BETA_COLUMN", "AF_COLUMN",
-                       "BATCH_SIZE", "MAGMA_WINDOW_UP", "MAGMA_WINDOW_DOWN"]:
+                       "BATCH_SIZE", "MAGMA_WINDOW_UP", "MAGMA_WINDOW_DOWN",
+                       "N_SAMPLES"]:
                 try:
                     int(value)
                 except ValueError:
@@ -64,6 +85,10 @@ class Command(BaseCommand):
             if key == "GENOME_BUILD":
                 if value not in ["GRCh37", "GRCh38"]:
                     raise CommandError(f"Invalid genome build: {value}. Expected 'GRCh37' or 'GRCh38'.")
+
+            if key == "MAGMA_MODEL":
+                if key not in ["snp-wise=mean", "snp-wise=top", "multi", "multi=snp-wise", "snp-wise=multi"] and not is_valid_snpwise_top(key):
+                    raise CommandError(f"MAGMA_MODEL must be a valid Magma model.")
 
         if missing:
             raise CommandError(f"Missing environment variables: {', '.join(missing)}")
@@ -87,3 +112,13 @@ class Command(BaseCommand):
                 raise CommandError(f"GWAS file does not exist: {in_filepath}")
 
         logger.info("All GWAS summary statistics files are present.")
+
+
+def is_valid_snpwise_top(key: str) -> bool:
+    if not key.startswith("snp-wise=top,"):
+        return False
+    value = key.split("snp-wise=top,")[1]
+    if value.isdigit() and int(value) > 0:
+        return True
+    float_val = float(value)
+    return 0.0 < float_val <= 1.0

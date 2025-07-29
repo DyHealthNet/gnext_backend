@@ -25,14 +25,15 @@ logger = logging.getLogger("backend")
 class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
-           logger.info("Starting generation of Manhanttan, QQ and Magma input files.")
+           logger.info("Starting generation of Manhattan, QQ%s." % (" and MAGMA input files" if settings.MAGMA_ENABLED else " files"))
            self.generate_manhattan_qq_magma_files()
-           self.prepare_MAGMA_mapping_input()
-           logger.info("Finished generation of Manhattan and QQ files!")
+           if settings.MAGMA_ENABLED:
+                  self.prepare_MAGMA_mapping_input()
+           logger.info("Finished generation of Manhattan, QQ%s!" % (" and MAGMA input files" if settings.MAGMA_ENABLED else " files"))
        except Exception as e:
            # print stack trace
            traceback.print_exc()
-           logger.error(f"Generation of Manhattan and QQ files failed: {e}")
+           logger.error(f"Generation of Manhattan{', QQ and MAGMA' if settings.MAGMA_ENABLED else ' and QQ'} files failed: {e}")
            sys.exit(1)
 
     @staticmethod
@@ -44,14 +45,17 @@ class Command(BaseCommand):
         os.makedirs(GWAS_manhattan_dir, exist_ok=True)
         GWAS_qq_dir = settings.GWAS_QQ_DIR
         os.makedirs(GWAS_qq_dir, exist_ok=True)
-        GWAS_magma_dir = settings.GWAS_MAGMA_DIR
-        os.makedirs(GWAS_magma_dir, exist_ok=True)
-        GWAS_magma_norm_dir = os.path.join(GWAS_magma_dir, "input_GWAS_norm")
-        os.makedirs(GWAS_magma_norm_dir, exist_ok=True)
+        GWAS_annotated_vcf_file = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
+        lmdb_path = setup_rsid_mapping_lmdb(GWAS_annotated_vcf_file, GWAS_norm_dir)
 
-        GWAS_annotated_vcf_file =os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
-        # TODO check if files already contain rsID?
-        lmdb_path = setup_rsid_mapping_lmdb(GWAS_annotated_vcf_file, GWAS_magma_dir)
+        if settings.MAGMA_ENABLED:
+            GWAS_magma_dir = settings.GWAS_MAGMA_DIR
+            os.makedirs(GWAS_magma_dir, exist_ok=True)
+            GWAS_magma_norm_dir = os.path.join(GWAS_magma_dir, "input_GWAS_norm")
+            os.makedirs(GWAS_magma_norm_dir, exist_ok=True)
+        else:
+            GWAS_magma_norm_dir = None
+            logger.debug("No need to prepare Magma input, since Magma is disabled.")
 
         # Importing phenotypes
         pheno_dt = pd.read_csv(pheno_file)
@@ -84,7 +88,6 @@ class Command(BaseCommand):
         qq_filepath = os.path.join(GWAS_qq_dir, filename_base + "_qq.json")
         norm_filepath = os.path.join(GWAS_norm_dir, filename_base + ".gz")
         norm_with_rsid_filepath = norm_filepath.replace('.gz', '_rsid.gz')
-        magma_filepath = os.path.join(GWAS_magma_norm_dir, filename_base + ".txt")
 
         # Update normalized GWAS files with rsID
         if not os.path.exists(norm_with_rsid_filepath):
@@ -113,13 +116,15 @@ class Command(BaseCommand):
             logger.info("Skipping generation. QQ JSON file already exists: %s", qq_filepath)
 
         # MAGMA
-        if not os.path.exists(magma_filepath):
-            logger.info("Started MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
-            reader_for_magma = sniffers.guess_gwas_standard(norm_with_rsid_filepath).add_filter('neg_log_pvalue')
-            Command.generate_magma_input(reader_for_magma, magma_filepath, lmdb_path)
-            logger.info("COMPLETED: MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
-        else:
-            logger.info("Skipping generation. Magma input file already exists: %s", magma_filepath)
+        if settings.MAGMA_ENABLED:
+            magma_filepath = os.path.join(GWAS_magma_norm_dir, filename_base + ".txt")
+            if not os.path.exists(magma_filepath):
+                logger.info("Started MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
+                reader_for_magma = sniffers.guess_gwas_standard(norm_with_rsid_filepath).add_filter('neg_log_pvalue')
+                Command.generate_magma_input(reader_for_magma, magma_filepath, lmdb_path)
+                logger.info("COMPLETED: MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
+            else:
+                logger.info("Skipping generation. Magma input file already exists: %s", magma_filepath)
 
         return pheno['filename']
 
