@@ -81,8 +81,8 @@ def read_magma_config(config_path="magma_config.csv", return_max_window=False):
                 window_up = safe_non_negative_int(row.get("window_up"), "window_up", row)
                 window_down = safe_non_negative_int(row.get("window_down"), "window_down", row)
                 if return_max_window:
-                    window_up_max = window_up if window_up > window_up_max else window_up_max
-                    window_down_max = window_down if window_down > window_down_max else window_down_max
+                    window_up_max = max(window_up, window_up_max)
+                    window_down_max = max(window_down, window_down_max)
 
             else:
                 # Non-positional strategies don’t use windowing — default to 0 safely
