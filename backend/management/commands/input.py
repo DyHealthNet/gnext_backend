@@ -208,7 +208,7 @@ class Command(BaseCommand):
 
         for row in mconfig_rows:  # TODO use parallel processing
             mapping_strategy = (row.get("mapping_strategy") or "").lower()
-            if mapping_strategy.lower().strip() != "positional":
+            if mapping_strategy.strip() != "positional":
                 return  # TODO adapt here depending on mapping strategy
 
             curr_window_up = row.get("window_up")

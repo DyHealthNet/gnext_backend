@@ -111,11 +111,4 @@ class Command(BaseCommand):
         logger.info("MAGMA config file is valid.")
 
 
-def is_valid_snpwise_top(key: str) -> bool:
-    if not key.startswith("snp-wise=top,"):
-        return False
-    value = key.split("snp-wise=top,")[1]
-    if value.isdigit() and int(value) > 0:
-        return True
-    float_val = float(value)
-    return 0.0 < float_val <= 1.0
+# Removed the unused and duplicate function is_valid_snpwise_top.
