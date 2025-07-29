@@ -64,12 +64,14 @@ def safe_non_negative_int(value, field_name, row):
             f"Invalid value for '{field_name}' (must be a non-negative integer): {value} in row {row}"
         )
 
-def read_magma_config(config_path="magma_config.csv"):
+def read_magma_config(config_path="magma_config.csv", return_max_window=False):
     mconfigs = []
     seen = set()
 
     with open(config_path, newline="") as f:
         reader = csv.DictReader(f)
+        window_up_max = 0
+        window_down_max = 0
         for row in reader:
             model = row["model_type"].lower().strip()
             strategy = row["mapping_strategy"].lower().strip()
@@ -78,6 +80,10 @@ def read_magma_config(config_path="magma_config.csv"):
             if strategy == "positional":
                 window_up = safe_non_negative_int(row.get("window_up"), "window_up", row)
                 window_down = safe_non_negative_int(row.get("window_down"), "window_down", row)
+                if return_max_window:
+                    window_up_max = window_up if window_up > window_up_max else window_up_max
+                    window_down_max = window_down if window_down > window_down_max else window_down_max
+
             else:
                 # Non-positional strategies don’t use windowing — default to 0 safely
                 window_up = 0
@@ -103,6 +109,8 @@ def read_magma_config(config_path="magma_config.csv"):
                 "window_up": window_up,
                 "window_down": window_down
             })
+    if return_max_window:
+        return window_up_max, window_down_max
 
     return mconfigs
 

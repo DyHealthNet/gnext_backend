@@ -90,6 +90,8 @@ class Command(BaseCommand):
         norm_filepath = os.path.join(GWAS_norm_dir, filename_base + ".gz")
         norm_with_rsid_filepath = norm_filepath.replace('.gz', '_rsid.gz')
 
+        #TODO: Completed message also occures when there was an error, change that
+
         # Update normalized GWAS files with rsID
         if not os.path.exists(norm_with_rsid_filepath):
             logger.info("Started adding rsid to GWAS file: %s", norm_filepath)
@@ -202,6 +204,7 @@ class Command(BaseCommand):
 
         GWAS_annotated_vcf_file = settings.GWAS_ANNO_VCF_FILE
         GWAS_magma_dir = settings.GWAS_MAGMA_DIR
+        GWAS_annotated_vcf_path = os.path.join(settings.GWAS_VEP_DIR, GWAS_annotated_vcf_file)
 
         for row in mconfig_rows:  # TODO use parallel processing
             mapping_strategy = (row.get("mapping_strategy") or "").lower()
@@ -210,10 +213,8 @@ class Command(BaseCommand):
 
             curr_window_up = row.get("window_up")
             curr_window_down = row.get("window_down")
-            curr_GWAS_annotated_vcf_file = f"{curr_window_up}up_{curr_window_down}down_{GWAS_annotated_vcf_file}"
-            curr_GWAS_annotated_vcf_path = os.path.join(settings.GWAS_VEP_DIR, curr_GWAS_annotated_vcf_file)
 
-            curr_GWAS_magma_dir = os.path.join(GWAS_magma_dir, f"{settings.GWAS_MAGMA_DIR}_{mapping_strategy}_{curr_window_up}_{curr_window_down}")
+            curr_GWAS_magma_dir = os.path.join(GWAS_magma_dir, f"magma_{mapping_strategy}_{curr_window_up}_{curr_window_down}")
             os.makedirs(curr_GWAS_magma_dir, exist_ok=True)
 
             GWAS_anno_magma_file = os.path.join(curr_GWAS_magma_dir, settings.GWAS_ANNO_MAGMA_FILE)
@@ -225,13 +226,13 @@ class Command(BaseCommand):
                 without_gene_terms = ["regulatory_region_variant", "TF_binding_site_variant", "intergenic_variant",
                                       "intron_variant"]
 
-                csq_fields = Command.extract_csq_fields(GWAS_annotated_vcf_file)
+                csq_fields = Command.extract_csq_fields(GWAS_annotated_vcf_path)
 
                 gene_to_rsids = defaultdict(set)
 
 
                 i = 1
-                with gzip.open(curr_GWAS_annotated_vcf_path, 'rt') as f:
+                with gzip.open(GWAS_annotated_vcf_path, 'rt') as f:
                     for line in f:
                         if line.startswith('#'):
                             continue
@@ -259,9 +260,21 @@ class Command(BaseCommand):
                             if not gene or not rsid:
                                 continue
 
-                            # Check for consequences not in without_gene_terms
                             if any(c not in without_gene_terms for c in consequences):
-                                gene_to_rsids[gene].add(rsid)
+                                # If variant consequences not marked as up- or downstream it is inside the gene
+                                if any(c not in ("upstream_gene_variant", "downstream_gene_variant") for c in
+                                       consequences):
+                                    gene_to_rsids[gene].add(rsid)
+                                    continue
+                                # If not check if variant falls in current window
+                                distance = csq_dict.get("DISTANCE")
+                                if not distance:
+                                    continue
+                                if "upstream_gene_variant" in consequences and distance and int(distance) <= curr_window_up:
+                                    gene_to_rsids[gene].add(rsid)
+                                elif "downstream_gene_variant" in consequences and distance and int(
+                                        distance) <= curr_window_down:
+                                    gene_to_rsids[gene].add(rsid)
                                 continue
 
                         if i % 100000 == 0:
