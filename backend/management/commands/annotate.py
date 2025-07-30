@@ -7,7 +7,7 @@ import subprocess
 from decouple import config
 from django.conf import settings
 from django.core.management import CommandError
-from backend.utils.preprocessing.magma.magma import read_magma_config
+from backend.utils.preprocessing.magma.magma import read_magma_config, get_bool
 
 logger = logging.getLogger("backend")
 
@@ -26,7 +26,11 @@ class Command(BaseCommand):
         os.makedirs(GWAS_vep_dir, exist_ok=True)
         GWAS_vcf_file = settings.GWAS_VCF_FILE
         GWAS_annotated_vcf_file = settings.GWAS_ANNO_VCF_FILE
-        window_up, window_down = read_magma_config(config("MAGMA_CONFIG_FILE"), return_max_window=True)
+        if get_bool(config("MAGMA_ENABLED")):
+            window_up, window_down = read_magma_config(config("MAGMA_CONFIG_FILE"), return_max_window=True)
+        else:
+            window_up = 5000 # VEP default values
+            window_down = 5000
 
         # TODO: currently not generating the VCF file even if new phenotypes have been added
 
@@ -36,7 +40,7 @@ class Command(BaseCommand):
             logger.info("Skipping VCF generation, because VCF file already exists.")
         else:
             try:
-                subprocess.run(["bash", "backend/utils/preprocessing/bash/generate_full_variants_vcf.sh", GWAS_norm_dir, os.path.join(GWAS_vep_dir, GWAS_vcf_file)], check=True)
+                subprocess.run(["bash", "backend/utils/preprocessing/bash/generate_full_variants_vcf.sh", GWAS_norm_dir, os.path.join(GWAS_vep_dir, GWAS_vcf_file), str(config("MAX_WORKERS"))], check=True)
                 logger.info("COMPLETED: Generation of VCF file!")
             except subprocess.CalledProcessError as e:
                 raise CommandError(f"Failed to generate full VCF file: {e}")
@@ -46,7 +50,7 @@ class Command(BaseCommand):
             logger.info("Skipping VCF annotation, because annotated VCF file already exists.")
         else:
             try:
-                subprocess.run(["bash", "backend/utils/preprocessing/bash/run_vep.sh", GWAS_vcf_file, GWAS_annotated_vcf_file, GWAS_vep_dir, genome_build, str(window_up), str(window_down)], check=True)
+                subprocess.run(["bash", "backend/utils/preprocessing/bash/run_vep.sh", GWAS_vcf_file, GWAS_annotated_vcf_file, GWAS_vep_dir, genome_build, str(window_up), str(window_down), str(config("MAX_WORKERS"))], check=True)
                 logger.info("COMPLETED: Annotation of VCF file!")
             except subprocess.CalledProcessError as e:
                 raise CommandError(f"Failed to run VEP: {e}")
