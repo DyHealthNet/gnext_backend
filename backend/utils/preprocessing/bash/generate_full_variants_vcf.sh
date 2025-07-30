@@ -25,12 +25,19 @@ OUT_DIR=$(dirname "$OUTPUT_FILE")
   printf '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n'
 } > "$OUTPUT_FILE"
 
+# Check if pigz is available
+if command -v pigz &>/dev/null; then
+  USE_PIGZ=true
+else
+  USE_PIGZ=false
+fi
+
 # process everything in parallel, stream into a single sort/uniq
 find "$DATA_DIR" -maxdepth 1 -type f -name '*.gz' \
   | parallel -j"$NUM_JOBS" --no-notice '
       PHENO={/.}
       # use pigz if available, fall back to gzip
-      if command -v pigz &>/dev/null; then
+      if [[ "$USE_PIGZ" == true ]]; then
         pigz -dc "{}"
       else
         gzip -cd "{}"
