@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Usage: ./run_vep.sh input.vcf output.vcf.bgz /absolute/path/to/vep_data genome_build window_up window_down
+# Usage: ./run_vep.sh input.vcf output.vcf.bgz /absolute/path/to/vep_data genome_build window_up window_down num_jobs
 
 set -euo pipefail
 
@@ -10,10 +10,13 @@ VEP_DIR="$3"
 GENOME_BUILD=$4
 WINDOW_UP=$5
 WINDOW_DOWN=$6
+NUM_JOBS="${7:-$(nproc)}"
 
 VEP_CACHE_DIR="$VEP_DIR/vep_data/"
 
 echo "Starting VEP run at $(date)"
+
+echo $VEP_CACHE_DIR
 
 docker run \
   -v "$VEP_DIR":/data \
@@ -25,7 +28,7 @@ docker run \
     --offline \
     --dir_cache /data/vep_data \
     --compress_output bgzip \
-    --fork 4 \
+    --fork "$NUM_JOBS" \
     --everything \
     --vcf \
     --species homo_sapiens \

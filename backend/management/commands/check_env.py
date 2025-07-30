@@ -7,7 +7,7 @@ from django.core.management import CommandError
 from decouple import UndefinedValueError
 import pandas as pd
 
-from pheweb_backend.settings import MAGMA_ENABLED
+from dyhealthnetlight.settings import MAGMA_ENABLED
 
 logger = logging.getLogger("backend")
 

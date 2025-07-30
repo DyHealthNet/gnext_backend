@@ -1,65 +1,66 @@
-#!/bin/bash
-
-# Usage: ./generate_full_variants_vcf.sh /path/to/tsv_directory /path/to/output.vcf
-
+#!/usr/bin/env bash
 set -euo pipefail
+export LC_ALL=C
+
+# Usage: ./generate_full_variants_vcf.sh /path/to/GWAS_dirs /path/to/output.vcf NUM_JOBS
+
+# Print time
+echo "Starting VCF generation at $(date)"
 
 DATA_DIR="$1"
 OUTPUT_FILE="$2"
+NUM_JOBS="$3"
 
-if [[ -z "$DATA_DIR" || ! -d "$DATA_DIR" ]]; then
-  echo "Usage: $0 /path/to/GWAS_stats_norm /path/to/output.vcf"
+if [[ ! -d "$DATA_DIR" ]]; then
+  echo "Usage: $0 /path/to/tsv_directory /path/to/output.vcf [NUM_JOBS]" >&2
   exit 1
 fi
 
-# Check parent directory of output file exists
 OUT_DIR=$(dirname "$OUTPUT_FILE")
-if [[ ! -d "$OUT_DIR" ]]; then
-  echo "Error: Output directory '$OUT_DIR' does not exist."
-  exit 1
-fi
+[[ -d "$OUT_DIR" ]] || { echo "Error: $OUT_DIR does not exist." >&2; exit 1; }
 
-TMP_DIR="$OUT_DIR/tmp_variants"
-RAW_BODY="$TMP_DIR/variants_raw_body.tsv"
+# write header
+{
+  printf '##fileformat=VCFv4.2\n'
+  printf '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n'
+} > "$OUTPUT_FILE"
 
-echo "Creating working directory: $TMP_DIR"
-mkdir -p "$TMP_DIR"
-rm -f "$RAW_BODY" "$OUTPUT_FILE"
+# process everything in parallel, stream into a single sort/uniq
+find "$DATA_DIR" -maxdepth 1 -type f -name '*.gz' \
+  | parallel -j"$NUM_JOBS" --no-notice '
+      PHENO={/.}
+      # use pigz if available, fall back to gzip
+      if command -v pigz &>/dev/null; then
+        pigz -dc "{}"
+      else
+        gzip -cd "{}"
+      fi \
+      | awk -v pheno="$PHENO" -F"\t" -v OFS="\t" "
+          NR==1 {
+            for (i=1; i<=NF; i++) {
+              h=tolower(\$i)
+              if (h==\"#chrom\"||h==\"chrom\") c=i
+              if (h==\"pos\")                  p=i
+              if (h==\"ref\")                  r=i
+              if (h==\"alt\")                  a=i
+            }
+            if (!c||!p||!r||!a) {
+              print \"ERROR: header missing columns in \" pheno > \"/dev/stderr\"
+              exit 1
+            }
+            next
+          }
+          \$c&&\$p&&\$r&&\$a {
+            print \$c, \$p, \".\", \$r, \$a, \".\", \".\", \".\"
+          }
+      "
+' \
+  | sort -k1,1 -k2,2n -S10G \
+  | uniq \
+  >> "$OUTPUT_FILE"
 
-# Save VCF header
-echo -e "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO" > "$OUTPUT_FILE"
+chmod 777 "$OUTPUT_FILE"
+echo "Done. VCF written to: $OUTPUT_FILE"
 
-echo "Processing .gz files in $DATA_DIR..."
-
-for f in "$DATA_DIR"/*.gz; do
-  [[ -e "$f" ]] || continue
-  PHENO=$(basename "$f" .gz)
-
-  echo "Extracting variants from $PHENO..."
-
-  zcat "$f" | awk -v pheno="$PHENO" -F'\t' '
-    BEGIN {OFS="\t"}
-    NR==1 {
-      for (i=1; i<=NF; i++) {
-        if (tolower($i)=="#chrom" || tolower($i)=="chrom") c=i;
-        if (tolower($i)=="pos") p=i;
-        if (tolower($i)=="ref") r=i;
-        if (tolower($i)=="alt") a=i;
-      }
-      if (!c || !p || !r || !a) {
-        print "ERROR: Required columns not found in header of " pheno > "/dev/stderr"
-        exit 1
-      }
-      next
-    }
-    $c && $p && $r && $a {
-      print $c, $p, ".", $r, $a, ".", ".", "."
-    }
-  ' >> "$RAW_BODY"
-done
-
-echo "Deduplicating and sorting variants..."
-sort -k1,1 -k2,2n "$RAW_BODY" | uniq >> "$OUTPUT_FILE"
-
-echo "Done."
-echo "VCF written to: $OUTPUT_FILE"
+# Print end time
+echo "Finished VCF generation at $(date)"
