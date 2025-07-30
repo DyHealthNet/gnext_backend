@@ -50,7 +50,7 @@ class Command(BaseCommand):
             logger.info("Skipping VCF annotation, because annotated VCF file already exists.")
         else:
             try:
-                subprocess.run(["bash", "backend/utils/preprocessing/bash/run_vep.sh", GWAS_vcf_file, GWAS_annotated_vcf_file, GWAS_vep_dir, genome_build, str(config("MAX_WORKERS")), str(window_up), str(window_down)], check=True)
+                subprocess.run(["bash", "backend/utils/preprocessing/bash/run_vep.sh", GWAS_vcf_file, GWAS_annotated_vcf_file, GWAS_vep_dir, genome_build, str(window_up), str(window_down), str(config("MAX_WORKERS"))], check=True)
                 logger.info("COMPLETED: Annotation of VCF file!")
             except subprocess.CalledProcessError as e:
                 raise CommandError(f"Failed to run VEP: {e}")
