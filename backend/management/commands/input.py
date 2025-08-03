@@ -161,7 +161,6 @@ class Command(BaseCommand):
             #   nearest_genes = []
 
             # v_dict['nearest_genes'] = nearest_genes
-            # v_dict['rsid'] = nearest_genes
 
             if math.isinf(v_dict['neg_log_pvalue']):
                 # JSON has no concept of infinity; use a string that browsers can type-coerce into the correct number
