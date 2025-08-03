@@ -90,22 +90,23 @@ class Command(BaseCommand):
         manhattan_filepath = os.path.join(GWAS_manhattan_dir, norm_filename + "_manhattan.json")
         qq_filepath = os.path.join(GWAS_qq_dir, norm_filename + "_qq.json")
         norm_filepath = os.path.join(GWAS_norm_dir, norm_filename + ".gz")
-        norm_with_rsid_filepath = norm_filepath.replace('.gz', '_rsid.gz')
+        # norm_with_rsid_filepath = norm_filepath.replace('.gz', '_rsid.gz')
 
         #TODO: Completed message also occurs when there was an error, change that
 
         # Update normalized GWAS files with rsID
-        if not os.path.exists(norm_with_rsid_filepath):
-            logger.info("Started adding rsid to GWAS file: %s", norm_filepath)
-            map_and_write_rsid(norm_filepath, lmdb_path)
-            logger.info("COMPLETED: Added rsid to GWAS file: %s", norm_with_rsid_filepath)
-        else:
-            logger.info("Skipping generation. GWAS file with rsid already exists: %s", norm_with_rsid_filepath)
+        # if not os.path.exists(norm_with_rsid_filepath):
+        #     logger.info("Started adding rsid to GWAS file: %s", norm_filepath)
+        #     map_and_write_rsid(norm_filepath, lmdb_path)
+        #     logger.info("COMPLETED: Added rsid to GWAS file: %s", norm_with_rsid_filepath)
+        # else:
+        #     logger.info("Skipping generation. GWAS file with rsid already exists: %s", norm_with_rsid_filepath)
 
         # Manhattan
         if not os.path.exists(manhattan_filepath):
             logger.info("Started Manhattan JSON file generation of GWAS file: %s", norm_filepath)
             reader_for_manhattan = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+            Command.add_rsID_with_lmdb(reader_for_manhattan, lmdb_path)
             Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
             logger.info("COMPLETED: Manhattan JSON file generation of GWAS file: %s", norm_filepath)
         else:
@@ -122,10 +123,11 @@ class Command(BaseCommand):
 
         # MAGMA
         if settings.MAGMA_ENABLED:
-            magma_filepath = os.path.join(GWAS_magma_norm_dir, filename_base + ".txt")
+            magma_filepath = os.path.join(GWAS_magma_norm_dir, norm_filename + ".txt")
             if not os.path.exists(magma_filepath):
                 logger.info("Started MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
-                reader_for_magma = sniffers.guess_gwas_standard(norm_with_rsid_filepath).add_filter('neg_log_pvalue')
+                reader_for_magma = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+                Command.add_rsID_with_lmdb(reader_for_magma, lmdb_path)
                 Command.generate_magma_input(reader_for_magma, magma_filepath, lmdb_path)
                 logger.info("COMPLETED: MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
             else:
@@ -145,6 +147,7 @@ class Command(BaseCommand):
 
         # gl = get_genelocator(build, coding_only=False)
         for v_dict in manhattan_data['unbinned_variants']:
+            logger.debug(f"v_dict looks like this: {v_dict}")
             # Annotate nearest gene(s) for all "top hits", and also clean up values so JS can handle them
             # It's possible to have more than one nearest gene for a given position (if variant is inside, not just near)
             # try:
@@ -159,6 +162,7 @@ class Command(BaseCommand):
             #   nearest_genes = []
 
             # v_dict['nearest_genes'] = nearest_genes
+            # v_dict['rsid'] = nearest_genes
 
             if math.isinf(v_dict['neg_log_pvalue']):
                 # JSON has no concept of infinity; use a string that browsers can type-coerce into the correct number
@@ -302,4 +306,9 @@ class Command(BaseCommand):
                     parts[-1] = parts[-1].strip('">')
                     return parts
         raise ValueError("No CSQ format found.")
+
+    def add_rsID_with_lmdb(reader, lmdb_path):
+        build = lmdb_path + "/data.mdb"
+        rsid_finder = lookups.SnpToRsid(build, test=False)
+        reader.add_lookup('rsid', lambda variant: rsid_finder(variant.chrom, variant.pos, variant.ref, variant.alt))
 
