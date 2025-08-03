@@ -306,6 +306,7 @@ class Command(BaseCommand):
                     return parts
         raise ValueError("No CSQ format found.")
 
+    @staticmethod
     def add_rsID_with_lmdb(reader, lmdb_path):
         build = lmdb_path + "/data.mdb"
         rsid_finder = lookups.SnpToRsid(build, test=False)
