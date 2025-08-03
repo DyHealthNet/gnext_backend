@@ -147,7 +147,6 @@ class Command(BaseCommand):
 
         # gl = get_genelocator(build, coding_only=False)
         for v_dict in manhattan_data['unbinned_variants']:
-            logger.debug(f"v_dict looks like this: {v_dict}")
             # Annotate nearest gene(s) for all "top hits", and also clean up values so JS can handle them
             # It's possible to have more than one nearest gene for a given position (if variant is inside, not just near)
             # try:
