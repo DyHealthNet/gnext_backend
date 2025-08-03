@@ -307,7 +307,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def add_rsID_with_lmdb(reader, lmdb_path):
-        build = lmdb_path + "/data.mdb"
+        build = os.path.join(lmdb_path, "data.mdb")
         rsid_finder = lookups.SnpToRsid(build, test=False)
         reader.add_lookup('rsid', lambda variant: rsid_finder(variant.chrom, variant.pos, variant.ref, variant.alt))
 
