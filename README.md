@@ -5,15 +5,15 @@
 Create a conda environment using the requirements.txt file
 
 ```bash
-conda create -n dyhealthnetlight python=3.10
-conda activate dyhealthnetlight
+conda create -n dyhealthnetlight_backend python=3.10
+conda activate dyhealthnetlight_backend
 pip install -r requirements.txt
 ```
 
 Activate your conda environment
 
 ```bash
-conda activate dyhealthnetlight
+conda activate dyhealthnetlight_backend
 ```
 
 
