@@ -57,9 +57,9 @@ class Command(BaseCommand):
             raise CommandError(f"Failed to setup VEP: {e}")
 
         # Config variables
-        api_key = config('TYPESENSE_KEY')
-        typesense_host = config('TYPESENSE_HOST')
-        typesense_port = config('TYPESENSE_PORT')
+        api_key = config('VITE_TYPESENSE_KEY')
+        typesense_host = config('VITE_TYPESENSE_HOST')
+        typesense_port = config('VITE_TYPESENSE_PORT')
 
         # Check if Autocomplete schema exists -> if not create it
         client = typesense.Client({

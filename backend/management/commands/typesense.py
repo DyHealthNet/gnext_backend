@@ -18,9 +18,9 @@ class Command(BaseCommand):
        try:
 
            # Config variables
-           api_key = config('TYPESENSE_KEY')
-           typesense_host = config('TYPESENSE_HOST')
-           typesense_port = config('TYPESENSE_PORT')
+           api_key = config('VITE_TYPESENSE_KEY')
+           typesense_host = config('VITE_TYPESENSE_HOST')
+           typesense_port = config('VITE_TYPESENSE_PORT')
            batch_size = int(config("BATCH_SIZE"))
            pheno_file = config('PHENO_FILE')
 
@@ -57,6 +57,10 @@ class Command(BaseCommand):
         # Importing phenotypes (here don't check whether phenotype already in typesense, because upsert does this)
         for i, r in pheno_dt.iterrows():
             logger.info(f"Importing phenotype to typesense: {r['phenocode']}")
+
+            # Check if external_id exists, if not -> add ""
+            if 'external_id' not in r:
+                r['external_id'] = ""
 
             # Add phenotype to schema
             doc = {

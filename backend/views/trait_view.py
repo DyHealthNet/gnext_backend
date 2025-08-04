@@ -6,6 +6,9 @@ from rest_framework import generics
 import logging
 import re
 import json
+from django.conf import settings
+import os
+
 
 from backend.utils.typesense_client import get_phenotype_from_typesense
 
@@ -22,8 +25,9 @@ class ManhattanView(generics.GenericAPIView):
         pheno_info = get_phenotype_from_typesense(trait)
         file_name = pheno_info[0]['filename'] if pheno_info else None
         if file_name is not None:
-            manhattan_file = dir_path + "GWAS_manhattan/" + file_name.replace(".tsv.bgz", "_manhattan.json")
-            with open(manhattan_file, "r") as f:
+            norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(file_name))
+            manhattan_filepath = os.path.join(settings.GWAS_MANHATTAN_DIR, norm_filename + "_manhattan.json")
+            with open(manhattan_filepath, "r") as f:
                 manhattan_data = json.load(f)
             return JsonResponse(manhattan_data)
         else:
@@ -41,8 +45,9 @@ class QQView(generics.GenericAPIView):
         pheno_info = get_phenotype_from_typesense(trait)
         file_name = pheno_info[0]['filename'] if pheno_info else None
         if file_name is not None:
-            qq_file = dir_path + "GWAS_qq/" + file_name.replace(".tsv.bgz", "_qq.json")
-            with open(qq_file, "r") as f:
+            norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(file_name))
+            qq_filepath = os.path.join(settings.GWAS_QQ_DIR, norm_filename + "_qq.json")
+            with open(qq_filepath, "r") as f:
                 qq_data = json.load(f)
             return JsonResponse(qq_data)
         else:

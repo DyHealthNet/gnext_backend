@@ -7,13 +7,18 @@ from backend.utils.converters import convert_variant_id
 from django.conf import settings
 import os
 import logging
+import re
+from django.conf import settings
+
 
 logger = logging.getLogger('backend')
 
 def extract_GWAS_results_for_variant_and_phenotype(filename, phenocode, pheno_category, pheno_label, variant_id):
     # Extract GWAS results of variant from phenotype file via tabix
-    filename = os.path.join(settings.GWAS_NORM_DIR, filename.split(".")[0] + ".gz")
-    tabix_file = pysam.TabixFile(filename)
+    norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(filename))
+    norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
+
+    tabix_file = pysam.TabixFile(norm_filepath)
     # Get variant information
     chr, pos, ref, alt = convert_variant_id(variant_id)
 

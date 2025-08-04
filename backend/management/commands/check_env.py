@@ -15,9 +15,9 @@ logger = logging.getLogger("backend")
 class Command(BaseCommand):
     def handle(self, *args, **options):
         required_keys = [
-            "TYPESENSE_KEY",
-            "TYPESENSE_HOST",
-            "TYPESENSE_PORT",
+            "VITE_TYPESENSE_KEY",
+            "VITE_TYPESENSE_HOST",
+            "VITE_TYPESENSE_PORT",
             "VITE_API_URL",
             "VITE_STUDY_NAME",
             "VITE_GENOME_BUILD",

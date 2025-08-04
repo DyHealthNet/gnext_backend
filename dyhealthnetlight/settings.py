@@ -140,11 +140,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Typesense config
 TYPESENSE_CONFIG = {
     "nodes": [{
-        "host": config("TYPESENSE_HOST"),
-        "port": config("TYPESENSE_PORT"),
+        "host": config("VITE_TYPESENSE_HOST"),
+        "port": config("VITE_TYPESENSE_PORT"),
         "protocol": "http"
     }],
-    "api_key": config("TYPESENSE_KEY"),
+    "api_key": config("VITE_TYPESENSE_KEY"),
     "connection_timeout_seconds": 2
 }
 

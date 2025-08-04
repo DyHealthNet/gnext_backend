@@ -26,7 +26,6 @@ python-decouple==3.8
 pytz==2025.2
 requests==2.32.4
 scipy==1.16.0
-setuptools==78.1.1
 six==1.17.0
 sortedcontainers==2.4.0
 sqlparse==0.5.3
@@ -34,4 +33,3 @@ statsmodels==0.14.4
 typesense==1.1.1
 tzdata==2025.2
 urllib3==2.5.0
-wheel==0.45.1
