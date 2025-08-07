@@ -10,6 +10,7 @@ from backend.utils.preprocessing.zorp.zorp import parsers
 from django.conf import settings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import re
+from backend.utils.preprocessing.magma.magma import get_bool
 
 logger = logging.getLogger("backend")
 
@@ -42,12 +43,14 @@ class Command(BaseCommand):
             "ref_col": int(config("REF_COLUMN")),
             "alt_col": int(config("ALT_COLUMN")),
             "pval_col": int(config("PVAL_COLUMN")),
-            "is_neg_log_pvalue": True,
+            "is_neg_log_pvalue": get_bool(config("PVAL_NEGLOG10")),
             'beta_col': int(config("BETA_COLUMN")),
             'stderr_beta_col': int(config("SE_COLUMN")),
             'allele_freq_col': int(config("AF_COLUMN")),
             'rsid': None
         }
+
+        logger.info("Parser options: %s", parser_options)
 
         # Normalize GWAS files
         with ProcessPoolExecutor(max_workers=int(config("MAX_WORKERS"))) as executor:

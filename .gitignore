@@ -128,7 +128,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+.env_old
 .venv
 env/
 venv/
@@ -175,5 +175,7 @@ cython_debug/
 
 *.DS_Store
 data/
-.env
+.env_old
+.env_new
 .idea/
+db.sqlite3

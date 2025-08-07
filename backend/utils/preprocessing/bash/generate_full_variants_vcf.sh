@@ -32,9 +32,11 @@ else
   USE_PIGZ=false
 fi
 
+mkdir -p "$DATA_DIR/tmp"
+
 # process everything in parallel, stream into a single sort/uniq
 find "$DATA_DIR" -maxdepth 1 -type f -name '*.gz' \
-  | parallel -j"$NUM_JOBS" --no-notice '
+  | parallel -j"$NUM_JOBS" --tmpdir "$DATA_DIR/tmp" --compress --no-notice '
       PHENO={/.}
       # use pigz if available, fall back to gzip
       if [[ "$USE_PIGZ" == true ]]; then
@@ -62,7 +64,7 @@ find "$DATA_DIR" -maxdepth 1 -type f -name '*.gz' \
           }
       "
 ' \
-  | sort -k1,1 -k2,2n -S10G \
+  | sort -k1,1 -k2,2n -S10G --temporary-directory="$DATA_DIR/tmp" \
   | uniq \
   >> "$OUTPUT_FILE"
 

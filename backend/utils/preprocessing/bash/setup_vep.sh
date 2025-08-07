@@ -20,7 +20,7 @@ if [ -n "$TARGET_DIR" ]; then
     exit 0
 fi
 
-echo "No existing VEP cache found for $GENOME_BUILD. Proceeding with setup..."
+echo "No existing VEP cache found for $GENOME_BUILD in $TARGET_DIR Proceeding with setup..."
 
 echo "Creating VEP cache directory: $VEP_CACHE_DIR"
 mkdir -p "$VEP_CACHE_DIR"

@@ -50,15 +50,15 @@ class Command(BaseCommand):
                 raise CommandError(f"{description} does not exist: {path}")
 
         for i, r in pheno_dt.iterrows():
-            in_filepath = os.path.join(GWAS_dir, r['filename'])
-            norm_filepath = os.path.join(settings.GWAS_NORM_DIR, r['filename'].split(".")[0] + ".gz")
-            manhattan_filepath = os.path.join(settings.GWAS_MANHATTAN_DIR, r['filename'].split(".")[0] + "_manhattan.json")
-            qq_filepath = os.path.join(settings.GWAS_QQ_DIR, r['filename'].split(".")[0] + "_qq.json")
-            if settings.MAGMA_ENABLED:
-                magma_input_filepath = os.path.join(os.path.join(settings.GWAS_MAGMA_DIR, "input_GWAS_norm"), r['filename'].split(".")[0] + ".txt")
-                magma_output_filepath = os.path.join(settings.GWAS_MAGMA_RESULT_DIR,  r['filename'].split(".")[0] + ".genes.out")
+            norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(filename))
+            norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
+            manhattan_filepath = os.path.join(settings.GWAS_MANHATTAN_DIR, norm_filename + "_manhattan.json")
+            qq_filepath = os.path.join(settings.GWAS_QQ_DIR, norm_filename + "_qq.json")
 
-            check_file_exists(in_filepath, f"Input file for phenotype {r['phenocode']}")
+            if settings.MAGMA_ENABLED:
+                magma_input_filepath = os.path.join(os.path.join(settings.GWAS_MAGMA_DIR, "input_GWAS_norm"), norm_filename + ".txt")
+                magma_output_filepath = os.path.join(settings.GWAS_MAGMA_RESULT_DIR,  norm_filename + ".genes.out")
+
             check_file_exists(norm_filepath, f"Normalized file for phenotype {r['phenocode']}")
             check_file_exists(manhattan_filepath, f"Manhattan plot file for phenotype {r['phenocode']}")
             check_file_exists(qq_filepath, f"QQ plot file for phenotype {r['phenocode']}")

@@ -118,7 +118,7 @@ from decouple import Config, RepositoryEnv
 
 # Example usage:
 if __name__ == "__main__":
-    config = Config(RepositoryEnv('/nfs/scratch/DyHealthNetLight/pheweb_backend_new/dyhealthnetlight/.env'))
+    config = Config(RepositoryEnv('/nfs/scratch/DyHealthNetLight/pheweb_backend_new/dyhealthnetlight/.env_old'))
     mconfigs = read_magma_config(config("MAGMA_CONFIG_FILE"))
     for cfg in mconfigs:
         print(cfg)
