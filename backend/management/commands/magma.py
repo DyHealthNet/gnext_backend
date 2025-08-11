@@ -46,7 +46,7 @@ class Command(BaseCommand):
             curr_window_up = row.get("window_up")
             curr_window_down = row.get("window_down")
 
-            curr_GWAS_magma_dir = os.path.join(GWAS_magma_dir,f"{settings.GWAS_MAGMA_DIR}_{mapping_strategy}_{curr_window_up}_{curr_window_down}")
+            curr_GWAS_magma_dir = os.path.join(GWAS_magma_dir, f"magma_{mapping_strategy}_{curr_window_up}_{curr_window_down}")
             curr_GWAS_magma_result_dir = os.path.join(curr_GWAS_magma_dir, "MAGMA_results")
             os.makedirs(curr_GWAS_magma_result_dir, exist_ok=True)
 
