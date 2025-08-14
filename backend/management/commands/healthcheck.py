@@ -103,23 +103,7 @@ class Command(BaseCommand):
         except subprocess.CalledProcessError as e:
             raise CommandError(f"Error checking for typesense docker container: {e}")
 
-        # Check if typesense has entries in the autocomplete collection
-
-        # Config variables
-        api_key = config('VITE_TYPESENSE_KEY')
-        typesense_host = config('VITE_TYPESENSE_HOST')
-        typesense_port = config('VITE_TYPESENSE_PORT')
-
-        # Check if Autocomplete schema exists -> if not create it
-        client = typesense.Client({
-            'api_key': api_key,
-            'nodes': [{
-                'host': typesense_host,
-                'port': typesense_port,
-                'protocol': 'http'
-            }],
-            'connection_timeout_seconds': 10
-        })
+        client = typesense.Client(config.TYPESENSE_CONFIG)
 
 
         # Check if collection exists, if not create it

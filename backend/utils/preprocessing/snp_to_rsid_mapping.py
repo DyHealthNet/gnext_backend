@@ -62,7 +62,7 @@ def add_rsid_to_gwas_stats(reader, output_path, genome_build='GRCh37', debug_mod
         logger.debug(f"Deleted original file and index: {output_path}")
 
 def setup_rsid_mapping_lmdb(vcf_path, magma_dir, num_chroms=25, map_size=10 ** 9):
-    lmdb_path = magma_dir + "/lmdb_" + config('VITE_GENOME_BUILD')
+    lmdb_path = magma_dir + "/lmdb_" + config('GENOME_BUILD')
     # Only build the LMDB if it doesn't exist or is missing required files
     if not os.path.isdir(lmdb_path) or not os.path.exists(os.path.join(lmdb_path, "data.mdb")):
         logger.info("LMDB not found, creating...")
