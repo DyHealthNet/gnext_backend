@@ -76,7 +76,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0):
         columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta',
                    'alt_allele_freq']
 
-        for row in tabix_file.fetch(chr, start - 1, end):
+        for row in tabix_file.fetch(chr, start - 1, end + 1):
             row = row.split("\t")
             row_dict = dict(zip(columns, row))
 
