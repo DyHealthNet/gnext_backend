@@ -58,7 +58,8 @@ class QQView(generics.GenericAPIView):
 class TraitView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         """
-        Handles GET requests to the QQ API.
+        Handles GET requests to retrieve variant data for a given trait, chromosome, and position range.
+        Supports queries by variant ID or chromosome range, with optional p-value cutoff filtering.
         """
         trait = request.GET.get("trait")
         # Get query parameters
