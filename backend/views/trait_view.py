@@ -77,7 +77,7 @@ class TraitView(generics.GenericAPIView):
         logger.debug(f"varid: {varid}")
         logger.debug(f"neighbor_range: {neighbor_range}")
 
-        if varid is not None and not "":
+        if varid is not None and varid != "":
             chr, pos, ref, alt = convert_variant_id(varid)
             start = max(pos - neighbor_range, 0)
             end = pos + neighbor_range
