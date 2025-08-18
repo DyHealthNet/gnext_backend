@@ -57,3 +57,54 @@ def extract_phenotype_results_for_variant(variant_id):
         if gwas_res is not None:
             phewas_data.append(gwas_res)
     return phewas_data
+
+def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0):
+    # Build path to gzipped/tabix-indexed GWAS file
+    norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(filename))
+    norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
+
+    # Initialize containers
+    rows = []
+    location = []
+    ref = []
+    alt = []
+    external_ids = []
+    allele_frequencies = []
+
+    try:
+        tabix_file = pysam.TabixFile(norm_filepath)
+        columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta',
+                   'alt_allele_freq']
+
+        for row in tabix_file.fetch(chr, start - 1, end):
+            row = row.split("\t")
+            row_dict = dict(zip(columns, row))
+
+            # Convert numeric fields
+            pvalue = float(row_dict["pvalue"]) if row_dict["pvalue"] != "." else None
+            if pvalue is not None and pvalue > pval_cutoff:
+                continue  # skip variants above cutoff
+
+            rows.append(row_dict)
+            location.append(int(row_dict["pos"]))
+            ref.append(row_dict["ref"])
+            alt.append(row_dict["alt"])
+            external_ids.append(row_dict["rsid"])
+            allele_frequencies.append(
+                float(row_dict["alt_allele_freq"]) if row_dict["alt_allele_freq"] != "." else None)
+
+        data = {
+            "header": columns,
+            "rows": rows,
+            "location": location,
+            "ref": ref,
+            "alt": alt,
+            "external_ids": external_ids,
+            "allele_frequencies": allele_frequencies,
+        }
+
+        return data
+
+    except Exception as e:
+        print(f"Error fetching data for {chr}:{start}-{end}: {e}")
+        return {"error": str(e)}
