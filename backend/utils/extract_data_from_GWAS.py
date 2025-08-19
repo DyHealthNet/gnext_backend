@@ -175,5 +175,5 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
             return data
 
         except Exception as e:
-            print(f"Error fetching data for {chr}:{start}-{end}: {e}")
+            logger.error(f"Error fetching data for {chr}:{start}-{end}: {e}")
             return {"error": str(e)}
