@@ -46,7 +46,9 @@ def extract_phenotype_results_for_variant(variant_id):
     # Iterate over all phenotypes and extract variant from corresponding file
     phenotypes = get_all_phenotypes_from_typesense() # TODO: check if getting the data from typesense is more efficient or just read the CSV again or storing the CSV in memory
     phewas_data = []
+    i = 0
     for phenotype in phenotypes:
+        i+=1
 
         # Check if the variant is present in the phenotype file
         gwas_res = extract_GWAS_results_for_variant_and_phenotype(phenotype['filename'],
@@ -56,4 +58,6 @@ def extract_phenotype_results_for_variant(variant_id):
                                                  variant_id)
         if gwas_res is not None:
             phewas_data.append(gwas_res)
+        if i % 1000 == 0:
+            logger.info(f"Extracted {i} phenotypes for variant {variant_id}")
     return phewas_data

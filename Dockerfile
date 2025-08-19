@@ -19,13 +19,15 @@ RUN python -m pip install --upgrade pip && \
 # App source
 COPY . .
 
+# create non-root user that can write /app
+RUN useradd -m -u 1000 -s /usr/sbin/nologin django \
+ && chown -R 1000:1000 /app
+USER 1000:1000
+
+
 # Make entrypoint executable
 RUN chmod 0755 /app/docker-entrypoint.sh
 
-# IMPORTANT: choose a user that can read/write your bind-mounts
-# If your host user is UID 1000, this avoids bind-mount permission issues
-RUN useradd -u 1000 -m django || true
-USER 1000:1000
 
 EXPOSE 8000
 ENV DJANGO_SETTINGS_MODULE=dyhealthnetlight.settings
