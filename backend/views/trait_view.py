@@ -73,7 +73,7 @@ class TraitView(generics.GenericAPIView):
         varid = request.GET.get("varid")
         neighbor_range = int(request.GET.get("range",0))
 
-        if varid is not None and not "":
+        if varid:
             chr, pos, ref, alt = convert_variant_id(varid)
             start = max(pos - neighbor_range, 0)
             end = pos + neighbor_range
