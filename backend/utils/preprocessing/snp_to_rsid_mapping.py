@@ -100,7 +100,6 @@ def build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, num_chroms=25):
             refalt_to_rsid = {}
 
             for alt in rec.alts:
-                #key = f"{chrom}:{pos}_{ref}/{alt}"
 
                 # Parse rsID from CSQ
                 csq_list = rec.info.get('CSQ')
