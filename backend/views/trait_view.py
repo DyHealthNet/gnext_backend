@@ -72,11 +72,6 @@ class TraitView(generics.GenericAPIView):
         varid = request.GET.get("varid")
         neighbor_range = int(request.GET.get("range",0))
 
-        logger.debug(f"trait: {trait}")
-        logger.debug(f"pval_cutoff: {pval_cutoff}")
-        logger.debug(f"varid: {varid}")
-        logger.debug(f"neighbor_range: {neighbor_range}")
-
         if varid is not None and not "":
             chr, pos, ref, alt = convert_variant_id(varid)
             start = max(pos - neighbor_range, 0)
@@ -86,9 +81,6 @@ class TraitView(generics.GenericAPIView):
             chr = request.GET.get("chr")
             start = int(request.GET.get("start",0))
             end = int(request.GET.get("end",0))
-        logger.debug(f"chr: {chr}")
-        logger.debug(f"start: {start}")
-        logger.debug(f"end: {end}")
 
         dir_path = config("GWAS_DIR")
         logger.info(f"Received request with trait: {trait}")
