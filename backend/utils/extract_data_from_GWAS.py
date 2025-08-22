@@ -14,6 +14,8 @@ from django.conf import settings
 import lmdb
 import struct, msgpack
 
+import time
+
 
 logger = logging.getLogger('backend')
 
@@ -102,7 +104,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
             for row in tabix_file.fetch(chr, start - 1, end):
                 row = row.split("\t")
                 if len(row) != len(columns):
-                    logger.warning(f"Skipping malformed row: {row}")
+                    logger.warning(f"Length of rows ({len(row) + 1}) does not match length of columns ({len(columns)}). Skipping malformed row: {row}")
                     continue
 
                 row_dict = dict(zip(columns, row))
@@ -119,6 +121,8 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
                 #if pvalue is not None and pvalue > pval_cutoff and pvalue != ".":
                 if pvalue is not None and pvalue > pval_cutoff:
                     continue
+
+                row_dict['variant_id'] = f"{chr}_{row_dict['pos']}_{row_dict['ref']}/{row_dict['alt']}"
 
                 if lmdb_env and txn:
                     if chr not in db_handles:
@@ -144,26 +148,32 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
                 allele_frequencies.append(
                     float(row_dict["alt_allele_freq"]) if row_dict["alt_allele_freq"] != "." else None)
 
-                if max_rows is not None and len(rows) > max_rows:
-                    # Sort by pvalue ascending (None = worst)
-                    def sort_key(r):
-                        try:
-                            return float(r["pvalue"])
-                        except (TypeError, ValueError):
-                            return float("inf")
+            temp_rows = len(rows)
+            start_time = time.time()
 
-                    sorted_indices = sorted(range(len(rows)), key=lambda i: sort_key(rows[i]))
-                    keep_indices = set(sorted_indices[:max_rows])
+            if max_rows is not None and len(rows) > max_rows:
+                # Sort by pvalue ascending (None = worst)
+                def sort_key(r):
+                    try:
+                        return float(r["pvalue"])
+                    except (TypeError, ValueError):
+                        return float("inf")
 
-                    rows = [rows[i] for i in sorted_indices[:max_rows]]
-                    location = [location[i] for i in sorted_indices[:max_rows]]
-                    ref = [ref[i] for i in sorted_indices[:max_rows]]
-                    alt = [alt[i] for i in sorted_indices[:max_rows]]
-                    external_ids = [external_ids[i] for i in sorted_indices[:max_rows]]
-                    allele_frequencies = [allele_frequencies[i] for i in sorted_indices[:max_rows]]
+                sorted_indices = sorted(range(len(rows)), key=lambda i: sort_key(rows[i]))
+
+                rows = [rows[i] for i in sorted_indices[:max_rows]]
+                location = [location[i] for i in sorted_indices[:max_rows]]
+                ref = [ref[i] for i in sorted_indices[:max_rows]]
+                alt = [alt[i] for i in sorted_indices[:max_rows]]
+                external_ids = [external_ids[i] for i in sorted_indices[:max_rows]]
+                allele_frequencies = [allele_frequencies[i] for i in sorted_indices[:max_rows]]
+
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            logger.debug(f"FINISHED FILTERING in {elapsed_time:.2f} seconds from {temp_rows} rows")
 
             data = {
-                "header": columns,
+                "header": ['variant_id'] + columns,
                 "rows": rows,
                 "location": location,
                 "ref": ref,
