@@ -74,7 +74,7 @@ class TraitView(generics.GenericAPIView):
 
         # rsid mode
         varid = request.GET.get("varid")
-        neighbor_range = int(request.GET.get("range",0))
+        neighbor_range = int(request.GET.get("range", 0))
 
         if varid:
             chr, pos, ref, alt = convert_variant_id(varid)
