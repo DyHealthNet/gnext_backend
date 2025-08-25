@@ -209,7 +209,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
     external_ids = []
     allele_frequencies = []
 
-    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
+    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_sorted_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
     db_handles = {}
 
     try:
@@ -228,7 +228,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
         lmdb_env = None
 
     tabix_file = pysam.TabixFile(norm_filepath)
-    columns = ['rsid', 'chrom', 'pos', 'ref', 'alt', 'neg_log_pvalue',
+    columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue',
                'pvalue', 'beta', 'stderr_beta', 'alt_allele_freq']
 
     with (lmdb_env.begin(buffers=True) if lmdb_env else contextlib.nullcontext()) as txn:
@@ -263,7 +263,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
 
                     # Lookup RSID using LMDB
                     if db:
-                        key_bytes = struct.pack('I', pos)
+                        key_bytes = struct.pack('>I', pos)
                         value_bytes = txn.get(key_bytes, db=db)
                         if value_bytes:
                             refalt_to_rsid = msgpack.unpackb(value_bytes, raw=False)
