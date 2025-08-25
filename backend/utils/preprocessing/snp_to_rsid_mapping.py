@@ -61,6 +61,7 @@ def add_rsid_to_gwas_stats(reader, output_path, genome_build='GRCh37', debug_mod
             os.remove(output_path + ".tbi")
         logger.debug(f"Deleted original file and index: {output_path}")
 
+        
 def setup_rsid_mapping_lmdb(vcf_path, dir_path, num_chroms=25, map_size=10 ** 9):
     lmdb_path = dir_path + "/lmdb_" + config('VITE_GENOME_BUILD')
     # Only build the LMDB if it doesn't exist or is missing required files

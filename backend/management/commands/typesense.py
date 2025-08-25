@@ -16,11 +16,6 @@ logger = logging.getLogger("backend")
 class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
-
-           # Config variables
-           api_key = config('VITE_TYPESENSE_KEY')
-           typesense_host = config('VITE_TYPESENSE_HOST')
-           typesense_port = config('VITE_TYPESENSE_PORT')
            batch_size = int(config("BATCH_SIZE"))
            pheno_file = config('PHENO_FILE')
 
@@ -28,7 +23,7 @@ class Command(BaseCommand):
 
            # Initialize the typesense client
            logger.info("Starting filling of typesense.")
-           self.fill_typesense(GWAS_annotated_vcf_file, pheno_file, batch_size, api_key, typesense_host, typesense_port)
+           self.fill_typesense(GWAS_annotated_vcf_file, pheno_file, batch_size)
            logger.info("Finished filling of typesense!")
        except Exception as e:
            # print stack trace
@@ -37,19 +32,44 @@ class Command(BaseCommand):
            sys.exit(1)
 
     @staticmethod
-    def fill_typesense(GWAS_annotated_vcf_file, pheno_file, batch_size, api_key, typesense_host, typesense_port):
+    def reset_collection_if_needed(client, collection_name):
+        try:
+            # Check if collection has any documents
+            results = client.collections[collection_name].documents.search({
+                "q": "*",
+                "query_by": "description",
+                "per_page": 1
+            })
+
+            if results["found"] > 0:
+                client.collections[collection_name].delete()
+                schema_autocomplete = {
+                    "name": "autocomplete",
+                    "fields": [
+                        {"name": "type", "type": "string", "facet": True},
+                        {"name": "id", "type": "string"},
+                        {"name": "description", "type": "string"},
+                        {"name": "external_ref", "type": "string"},
+                        {"name": "category", "type": "string"},
+                        {"name": "filename", "type": "string"},
+                    ]
+                }
+                client.collections.create(schema_autocomplete)
+            else:
+                logger.info(f"No existing documents found in {collection_name}.")
+
+        except Exception as e:
+            logger.error(f"Error resetting collection {collection_name}: {e}")
+
+    @staticmethod
+    def fill_typesense(GWAS_annotated_vcf_file, pheno_file, batch_size):
         """
         Fill Typesense with the provided parameters.
         """
-        client = typesense.Client({
-            'api_key': api_key,
-            'nodes': [{
-                'host': typesense_host,
-                'port': typesense_port,
-                'protocol': 'http'
-            }],
-            'connection_timeout_seconds': 10
-        })
+        client = typesense.Client(config.TYPESENSE_CONFIG)
+
+        # Remove all entries from the collection
+        Command.reset_collection_if_needed(client, "autocomplete")
 
         # Importing phenotypes
         pheno_dt = pd.read_csv(pheno_file)

@@ -175,7 +175,6 @@ cython_debug/
 
 *.DS_Store
 data/
-.env_old
-.env_new
+.env
 .idea/
 db.sqlite3

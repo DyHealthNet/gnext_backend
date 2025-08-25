@@ -1,0 +1,31 @@
+import pandas as pd
+import os
+import re
+from decouple import config
+
+
+from dyhealthnetlight.settings import GWAS_QQ_DIR
+
+filepath = "/storage03/larend/pgwas_data/pgwas_full_phenotype_file.csv"
+
+df = pd.read_csv(filepath)
+
+print(df.head())
+
+
+
+for i, row in df.iterrows():
+    # Check if manhattan and QQ file exist
+    GWAS_DIR = config("GWAS_DIR")
+    OUTPUT_DIR = config("OUTPUT_DIR", default=GWAS_DIR)
+    GWAS_MANHATTAN_DIR = os.path.join(OUTPUT_DIR, "GWAS_manhattan")
+    GWAS_QQ_DIR = os.path.join(OUTPUT_DIR, "GWAS_qq")
+    norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(row['filename']))
+    manhattan_filepath = os.path.join(GWAS_MANHATTAN_DIR, norm_filename + "_manhattan.json")
+    qq_filepath = os.path.join(GWAS_QQ_DIR, norm_filename + "_qq.json")
+    if not os.path.exists(manhattan_filepath):
+        print(f"Manhattan file does not exist: {manhattan_filepath}")
+    if not os.path.exists(qq_filepath):
+        print(f"QQ file does not exist: {qq_filepath}")
+
+

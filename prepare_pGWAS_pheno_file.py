@@ -2,7 +2,7 @@ import os
 import pandas as pd
 
 
-filepath = "/scratch/larend/DyHealthNetLight/pgwas_data/subtable0_20250730.txt"
+filepath = "/storage03/larend/pgwas_data/subtable0_20250730.txt"
 df = pd.read_csv(filepath, sep="\t")
 
 #print(df.head())
@@ -24,6 +24,12 @@ for file in os.listdir(basepath):
         description = " / ".join(subset_df["HARMONIZED_GENE_NAME"].astype(str).unique())
         external_id = " / ".join(subset_df["UniProt_ID"].astype(str).unique())
 
+        if category == "nan":
+            category = "Not given"
+
+        if description == "nan":
+            description = "Not given"
+
         # Create a one-row DataFrame to append
         new_row = pd.DataFrame([{
             "phenocode": phenocode,
@@ -36,5 +42,5 @@ for file in os.listdir(basepath):
         # Append to existing DataFrame
         new_df = pd.concat([new_df, new_row], ignore_index=True)
 
-new_df.to_csv("/scratch/larend/DyHealthNetLight/pgwas_data/phenotype_file.csv", index=False)
+new_df.to_csv("/storage03/larend/pgwas_data/pgwas_full_phenotype_file.csv", index=False)
 
