@@ -102,8 +102,9 @@ class TraitView(generics.GenericAPIView):
 class ChromosomeBoundsView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         """
-        Handles GET requests to retrieve variant data for a given trait, chromosome, and position range.
-        Supports queries by variant ID or chromosome range, with optional p-value cutoff filtering.
+        Handles GET requests to retrieve the minimum and maximum position bounds for each chromosome
+        in the GWAS file associated with a given trait. Returns a dictionary mapping chromosome names
+        to their position bounds (min and max).
         """
         start_time = time.time()
         trait = request.GET.get("trait")
