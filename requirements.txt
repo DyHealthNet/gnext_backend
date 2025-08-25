@@ -33,4 +33,4 @@ statsmodels==0.14.4
 typesense==1.1.1
 tzdata==2025.2
 urllib3==2.5.0
-zstandard==0.24.0
+gunicorn

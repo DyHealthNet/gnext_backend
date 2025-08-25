@@ -1,4 +1,0 @@
-[25/Aug/2025 10:12:50] INFO Starting normalization of GWAS summary statistics files.
-[25/Aug/2025 10:12:50] INFO Finished normalization of GWAS summary statistics files!
-[25/Aug/2025 10:12:50] INFO Starting LMDB build of GWAS summary statistics files.
-slurmstepd-mc2calc01: error: *** JOB 9700702 ON mc2calc01 CANCELLED AT 2025-08-25T12:13:01 ***

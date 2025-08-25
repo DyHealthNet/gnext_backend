@@ -1,6 +1,6 @@
 from .views.variant_view import PheWASView, VariantAnnotationView
 from .views.overview_view import OverviewDataView
-from .views.trait_view import ManhattanView, QQView, TraitInfoView
+from .views.trait_view import ManhattanView, QQView
 from django.urls import path
 
 
@@ -10,6 +10,5 @@ urlpatterns = [
     path("overview_stats/", OverviewDataView.as_view(), name="overview_stats"),
     path("trait_manhattan/", ManhattanView.as_view(), name="trait_manhattan"),
     path("trait_qq/", QQView.as_view(), name="trait_qq"),
-    path("trait_info/", TraitInfoView.as_view(), name = "trait_info")
 ]
 

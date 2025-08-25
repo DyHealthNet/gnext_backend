@@ -11,7 +11,6 @@ from django.conf import settings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import re
 from backend.utils.preprocessing.magma.magma import get_bool
-from backend.utils.preprocessing.variant_to_pvals_mapping import build_lmdb_neglogp_f32
 
 logger = logging.getLogger("backend")
 
@@ -19,17 +18,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
            logger.info("Starting normalization of GWAS summary statistics files.")
-           #self.normalize_GWAS_stats_files()
+           self.normalize_GWAS_stats_files()
            logger.info("Finished normalization of GWAS summary statistics files!")
-           logger.info("Starting LMDB build of GWAS summary statistics files.")
-           build_lmdb_neglogp_f32()
-           logger.info("Finished LMDB build of GWAS summary statistics files.")
        except Exception as e:
            # print stack trace
            traceback.print_exc()
-           logger.error(f"Normalization or LMDB creations of GWAS files failed: {e}")
+           logger.error(f"Normalization of GWAS files failed: {e}")
            sys.exit(1)
-
 
     @staticmethod
     def normalize_GWAS_stats_files():
