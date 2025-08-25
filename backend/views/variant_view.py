@@ -21,19 +21,11 @@ class PheWASView(generics.GenericAPIView):
 
         logger.info(f"Received request with build: {build}, filter: {filter}, format: {format}")
 
-        data = extract_phenotype_results_for_variant(variant_id)
-        if data is None:
+        results = extract_phenotype_results_for_variant(variant_id)
+        if results is None:
             return JsonResponse({"error": "No associations found for the given variant ID."}, status=404)
         else:
-            return JsonResponse({
-                "data": data,
-                "lastPage": None,
-                "meta": {
-                    "build": [
-                        "GRCh37"  # TODO: extract from configuration file
-                    ]
-                }
-            })
+            return JsonResponse(results)
 
 class VariantAnnotationView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):

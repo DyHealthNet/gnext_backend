@@ -101,6 +101,7 @@ def extract_variant_annotation(variant_id):
                             "gnomADg_SAS_AF": "SAS (gnomAD Genome)",
                             "gnomADg_MID_AF": "MID (gnomAD Genome)",
                             "gnomADg_AMI_AF": "AMI (gnomAD Genome)",
+                            "gnomADg_REMAINING_AF": "Remaining (gnomAD Genome)",
                             }
 
             allele_frequencies = {new_af_names.get(k, k): v for k, v in allele_frequencies.items()}
