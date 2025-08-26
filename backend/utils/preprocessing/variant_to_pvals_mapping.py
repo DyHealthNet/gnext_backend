@@ -1,273 +1,122 @@
-#!/usr/bin/env python3
-import os, re, json, time, sys, logging, multiprocessing as mp
-from collections import OrderedDict
-
+import zarr
 import numpy as np
 import pandas as pd
-import lmdb
 import pysam
+import re, os
 from decouple import config
 from django.conf import settings
-import zstandard as zstd
+import logging
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# =========================
-# Config
-# =========================
-PHENO_FILE    = config("PHENO_FILE")                       # CSV with columns: phenocode, filename
-GWAS_NORM_DIR = settings.GWAS_NORM_DIR                     # Folder with .gz + .tbi per trait
-OUT_DIR       = settings.GWAS_LMDB_VAR_PVAL_DIR            # Output directory
-MAX_WORKERS   = int(config("MAX_WORKERS", default="8"))
-P_COL         = 5                                          # 0-based p-value column
+from multiprocessing import Pool
 
-# LMDB settings
-# 8M variants × 7k traits × 4 bytes ≈ 224 GB raw across all chromosomes before compression/overhead.
-MAP_SIZE_BYTES = 512 * (1 << 30)                           # 512 GB
-LMDB_FLAGS = dict(subdir=True, writemap=False, metasync=False,
-                  sync=False, max_dbs=1, readahead=False, map_size=MAP_SIZE_BYTES)
-
-# Compression
-ZSTD_LEVEL  = 7
-ZSTD_COMP   = zstd.ZstdCompressor(level=ZSTD_LEVEL)
-ZSTD_DECOMP = zstd.ZstdDecompressor()
-
-# Cache: each vector is n_traits*4 bytes raw; with Python/NumPy overhead ~60–80 KB at 7k traits
-CACHE_CAPACITY    = int(config("CACHE_CAPACITY", default="20000"))   # good default for 64 GB with 8 workers
-COMMIT_EVERY_PUTS = 200_000
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(processName)s %(levelname)s %(message)s",
-    stream=sys.stdout,
-    force=True,
-)
-logger = logging.getLogger("lmdb_p_f32")
-
-# =========================
-# Helpers
-# =========================
-def variant_key(chrom: str, pos: int, ref: str, alt: str) -> bytes:
-    return f"{chrom}:{pos}:{ref}:{alt}".encode()
-
-def parse_line(line: str):
-    f = line.rstrip().split("\t")
-    if len(f) < 5:
-        return None
-    try:
-        pos = int(f[1])
-    except Exception:
-        return None
-    return f[0], pos, f[3], f[4]
-
-def get_pvalue(line: str) -> float:
-    f = line.rstrip().split("\t")
-    if P_COL >= len(f):
-        return np.nan
-    x = f[P_COL]
-    if x == "." or x == "":
-        return np.nan
-    try:
-        return float(x)
-    except Exception:
-        return np.nan
-
-def empty_vector(n_traits: int) -> np.ndarray:
-    # float32 with NaN sentinel for missing
-    return np.full((n_traits,), np.nan, dtype=np.float32)
-
-def compress_vec(arr: np.ndarray) -> bytes:
-    # Ensure C-contiguous
-    b = np.ascontiguousarray(arr).view(np.uint8)
-    return ZSTD_COMP.compress(b)
-
-def decompress_vec(buf: bytes, n_traits: int) -> np.ndarray:
-    # IMPORTANT: .copy() to make it writeable
-    raw = ZSTD_DECOMP.decompress(buf, max_output_size=n_traits * 4)
-    return np.frombuffer(raw, dtype=np.float32, count=n_traits).copy()
-
-# =========================
-# LRU write-back cache
-# =========================
-class LRUCache:
-    def __init__(self, capacity: int, n_traits: int, env: lmdb.Environment):
-        self.capacity = capacity
-        self.n_traits = n_traits
-        self.env = env
-        self.store = OrderedDict()   # key -> (np.ndarray, dirty)
-        self.txn = env.begin(write=True)
-        self.put_count = 0
-
-    def _commit_maybe(self):
-        self.put_count += 1
-        if self.put_count % COMMIT_EVERY_PUTS == 0:
-            self.txn.commit()
-            self.txn = self.env.begin(write=True)
-
-    def _evict_one(self):
-        k, (vec, dirty) = self.store.popitem(last=False)
-        if dirty:
-            self.txn.put(k, compress_vec(vec))
-            self._commit_maybe()
-
-    def get_for_update(self, key: bytes) -> np.ndarray:
-        if key in self.store:
-            vec, dirty = self.store.pop(key)
-            self.store[key] = (vec, dirty)
-            return vec
-        if len(self.store) >= self.capacity:
-            self._evict_one()
-        buf = self.txn.get(key)
-        vec = empty_vector(self.n_traits) if buf is None else decompress_vec(buf, self.n_traits)
-        if not vec.flags.writeable:  # belt & suspenders
-            vec = vec.copy()
-        self.store[key] = (vec, False)
-        return vec
-
-    def mark_dirty(self, key: bytes):
-        vec, _ = self.store.pop(key)
-        self.store[key] = (vec, True)
-
-    def flush_all(self):
-        for k, (vec, dirty) in list(self.store.items()):
-            if dirty:
-                self.txn.put(k, compress_vec(vec))
-        self.txn.commit()
-        self.txn = None
-        self.store.clear()
-
-# =========================
-# Build per chromosome
-# =========================
-def init_env(lmdb_path: str, traits: list[str]):
-    os.makedirs(os.path.dirname(lmdb_path), exist_ok=True)
-    env = lmdb.open(lmdb_path, **LMDB_FLAGS)
-    with env.begin(write=True) as txn:
-        txn.put(b"__meta__:n_traits", str(len(traits)).encode())
-        txn.put(b"__meta__:traits_json", json.dumps(traits).encode())
-        meta = {
-            "encoding": {"metric": "p", "dtype": "float32", "nan_is_missing": True},
-            "codec": {"type": "zstd", "level": ZSTD_LEVEL},
-            "p_col": P_COL,
-        }
-        txn.put(b"__meta__:info", json.dumps(meta).encode())
-    return env
-
-def build_chrom(args):
-    chrom, lmdb_root, traits, t2p, cache_capacity = args
-    n_traits = len(traits)
-    env = init_env(f"{lmdb_root}_chr{chrom}", traits)
-    cache = LRUCache(cache_capacity, n_traits, env)
-
-    chrom_t0 = time.time()
-    total_lines = 0
-    total_updates = 0
-    env_closed = False
-
-    try:
-        for j, trait in enumerate(traits):
-            trait_t0 = time.time()
-            lines_processed = 0
-            updates = 0
-
-            logger.info(f"chr{chrom} trait={trait} start ({j+1}/{len(traits)})")
-
-            tbx = pysam.TabixFile(t2p[trait])
-            try:
-                it = tbx.fetch(chrom)
-            except ValueError:
-                tbx.close()
-                logger.info(f"chr{chrom} trait={trait}: no records on this contig")
-                continue
-
-            for line in it:
-                head = parse_line(line)
-                if not head:
-                    continue
-                c, pos, ref, alt = head
-                key = variant_key(c, pos, ref, alt)
-
-                p = get_pvalue(line)
-                if not np.isnan(p):
-                    vec = cache.get_for_update(key)
-                    if np.isnan(vec[j]):
-                        vec[j] = np.float32(p)   # store raw p-value
-                        cache.mark_dirty(key)
-                        updates += 1
-                lines_processed += 1
+logger = logging.getLogger("backend")
 
 
-            tbx.close()
+VARIANT_ARRAY = None
 
-            dt_trait = time.time() - trait_t0
-            total_lines += lines_processed
-            total_updates += updates
-            logger.info(f"chr{chrom} trait={trait} end ({j+1}/{len(traits)}) "
-                        f"elapsed={dt_trait:.1f}s"
-            )
-        cache.flush_all()
-    except Exception:
-        try:
-            if cache.txn is not None:
-                cache.txn.abort()
-        except Exception:
-            pass
-        try:
-            env.close()
-            env_closed = True
-        except Exception:
-            pass
-        raise
-    finally:
-        if not env_closed:
-            try:
-                env.sync()
-            except Exception:
-                pass
-            try:
-                env.close()
-            except Exception:
-                pass
+def init_worker(variant_array):
+    global VARIANT_ARRAY
+    VARIANT_ARRAY = variant_array
 
-    dt = time.time() - chrom_t0
-    logger.info(f"chr{chrom} summary: lines={total_lines:,} updates={total_updates:,} time={dt:.1f}s")
-    return chrom
+def get_all_variants_as_numpy():
+    # Step 1: collect all variant IDs from your "master VCF"
+    variants = []
+    VCF_FILE = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
+    with pysam.VariantFile(VCF_FILE) as vcf:
+        for rec in vcf.fetch():
+            vid = f"{rec.contig}:{rec.pos}:{rec.ref}:{rec.alts[0]}"
+            variants.append(vid.encode())  # store as bytes for dtype="S"
 
-# =========================
-# Orchestrator
-# =========================
-def build_lmdb_neglogp_f32():
+    # Step 2: convert to NumPy fixed-width strings
+    variant_array = np.array(variants, dtype="S40")  # 40 chars per variant is safe
+
+    # Step 3: sort for searchsorted
+    variant_array.sort()
+    logger.info("Variant array constructed!")
+    return variant_array
+
+def process_trait(j, trait, filename):
     """
-    Kept name for backward compatibility. Writes p-only (float32) shards:
-    OUT_DIR/'lmdb_p_f32_chr{chrom}'.
-    """
-    pheno = pd.read_csv(PHENO_FILE)
+        Process one GWAS file and return the p-value column aligned to variant_array.
+        """
+    n = len(VARIANT_ARRAY)
+    col_pval = np.full(n, np.nan, dtype="f4")
+
+    with pysam.TabixFile(filename) as tbx:
+        for k, line in enumerate(tbx.fetch()):
+            f = line.strip().split("\t")
+            # Example: CHR POS ID REF ALT ... PVAL (assume pval is in col 5)
+            vid = f"{f[0]}:{f[1]}:{f[3]}:{f[4]}".encode()
+
+            i = np.searchsorted(VARIANT_ARRAY, vid)
+            if i < n and VARIANT_ARRAY[i] == vid:
+                try:
+                    pval = float(f[5])
+                except Exception:
+                    pval = np.nan
+                col_pval[i] = pval
+
+            if k > 0 and k % 1_000_000 == 0:
+                logger.info(f"Worker trait={trait} processed {k:,} lines so far")
+
+    return j, col_pval
+
+
+def create_zarr_variants_trait_pvalues():
+    # Get master variant index
+    variant_array = get_all_variants_as_numpy()
+    N_variants = len(variant_array)
+
+    # Traits metadata
+    pheno = pd.read_csv(config("PHENO_FILE"))
     traits = pheno["phenocode"].astype(str).tolist()
     paths = [
         os.path.join(
-            GWAS_NORM_DIR,
+            settings.GWAS_NORM_DIR,
             re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(i)) + ".gz"
         )
         for i in pheno["filename"].astype(str).tolist()
     ]
     t2p = dict(zip(traits, paths))
+    N_traits = len(traits)
 
-    first_file = paths[0]
-    with pysam.TabixFile(first_file) as tbx:
-        chroms = list(tbx.contigs)
+    # Create Zarr store (row-chunked)
+    root = zarr.open(settings.GWAS_ZARR_VARIANTS_TRAITS, mode="w")
+    z_pvals = root.create_dataset(
+        "pvalues",
+        shape=(N_variants, N_traits),
+        chunks=(10000, 1),  # row chunks (10k rows x 1 trait per chunk)
+        dtype="f4",
+        fill_value=np.nan,
+        compressor=zarr.Blosc(cname="zstd", clevel=5, shuffle=2),
+    )
 
-    os.makedirs(OUT_DIR, exist_ok=True)
-    lmdb_root = os.path.join(OUT_DIR, "lmdb_p_f32")  # renamed to reflect p-only
-    workers = min(MAX_WORKERS, len(chroms))
+    # Save metadata
+    root.create_dataset("variants", data=variant_array)
+    root.create_dataset("traits", data=np.array(traits, dtype="S40"))
 
-    logger.info(f"Build LMDB p-only float32 + zstd; P_COL={P_COL}; traits={len(traits)}; workers={workers}")
-    args = [(c, lmdb_root, traits, t2p, CACHE_CAPACITY) for c in chroms]
+    init_worker(variant_array)
+    j, col_pval = process_trait(0, traits[0], t2p[traits[0]])
+    logger.info("Non-NaN:", np.isfinite(col_pval).sum())
 
-    if workers > 1:
-        with mp.Pool(processes=workers) as pool:
-            for done in pool.imap_unordered(build_chrom, args):
-                pass
-    else:
-        for a in args:
-            build_chrom(a)
+    # Run in parallel with ProcessPoolExecutor
+    futures = {}
+    with ProcessPoolExecutor(max_workers=int(config("MAX_WORKERS")),
+                             initializer=init_worker,
+                             initargs=(variant_array,)
+                             ) as executor:
+        for j, trait in enumerate(traits):
+            fn = t2p[trait]
+            future = executor.submit(process_trait, j, trait, fn)
+            futures[future] = (j, trait)
 
-    logger.info("Done.")
-    return lmdb_root
+        for future in as_completed(futures):
+            j, trait = futures[future]
+            col_pval = future.result()
+            z_pvals[:, j] = col_pval
+            logger.info(f"Stored trait {j + 1}/{N_traits}: {trait}")
+
+
+
+

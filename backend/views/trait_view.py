@@ -10,6 +10,7 @@ import json
 from django.conf import settings
 import os
 import time
+import pysam
 
 
 from backend.utils.typesense_client import get_phenotype_from_typesense
@@ -31,7 +32,7 @@ class ManhattanView(generics.GenericAPIView):
                 manhattan_data = json.load(f)
             return JsonResponse(manhattan_data)
         else:
-            logger.error(f"No phenotype found for trait: {trait}")
+            logger.error(f"No phenotype found for trait: {trait_id}")
             return JsonResponse({"error": "Trait not found"}, status=404)
 
 class QQView(generics.GenericAPIView):
@@ -97,7 +98,7 @@ class TraitView(generics.GenericAPIView):
 
         logger.info(f"Received request with trait: {trait}")
         pheno_info = get_phenotype_from_typesense(trait)
-        file_name = pheno_info[0]['filename'] if pheno_info else None
+        file_name = pheno_info['filename'] if pheno_info else None
         if not file_name:
             return JsonResponse({"error": "Trait not found"}, status=404)
 
@@ -119,7 +120,7 @@ class ChromosomeBoundsView(generics.GenericAPIView):
         trait = request.GET.get("trait")
         logger.info(f"Received request with trait: {trait}")
         pheno_info = get_phenotype_from_typesense(trait)
-        file_name = pheno_info[0]['filename'] if pheno_info else None
+        file_name = pheno_info['filename'] if pheno_info else None
         if not file_name:
             return JsonResponse({"error": "Trait not found"}, status=404)
 

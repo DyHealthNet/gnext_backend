@@ -10,7 +10,7 @@ urlpatterns = [
     path("overview_stats/", OverviewDataView.as_view(), name="overview_stats"),
     path("trait_manhattan/", ManhattanView.as_view(), name="trait_manhattan"),
     path("trait_qq/", QQView.as_view(), name="trait_qq"),
-    path("trait_info/", TraitInfoView.as_view(), name = "trait_info")
+    path("trait_info/", TraitInfoView.as_view(), name = "trait_info"),
     path("trait_get_variants/", TraitView.as_view(), name="trait_get_variants"),
     path("trait_get_chromosomeBounds/", ChromosomeBoundsView.as_view(), name="trait_get_chromosomeBounds"),
 ]
