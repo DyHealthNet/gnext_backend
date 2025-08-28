@@ -11,7 +11,6 @@ from django.conf import settings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import re
 from backend.utils.preprocessing.magma.magma import get_bool
-from backend.utils.preprocessing.variant_to_pvals_mapping import create_zarr_variants_trait_pvalues
 
 logger = logging.getLogger("backend")
 
@@ -21,9 +20,6 @@ class Command(BaseCommand):
            logger.info("Starting normalization of GWAS summary statistics files.")
            #self.normalize_GWAS_stats_files()
            logger.info("Finished normalization of GWAS summary statistics files!")
-           logger.info("Starting ZARR build of GWAS summary statistics files.")
-           create_zarr_variants_trait_pvalues()
-           logger.info("Finished ZARR build of GWAS summary statistics files.")
        except Exception as e:
            # print stack trace
            traceback.print_exc()

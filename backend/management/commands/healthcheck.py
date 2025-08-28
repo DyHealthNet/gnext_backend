@@ -10,6 +10,7 @@ from decouple import config
 import typesense
 from django.conf import settings
 import pandas as pd
+import re
 
 logger = logging.getLogger("backend")
 

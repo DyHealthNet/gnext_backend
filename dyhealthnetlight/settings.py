@@ -161,7 +161,7 @@ MAGMA_ENABLED = get_bool(config("MAGMA_ENABLED"))
 GWAS_MAGMA_DIR = os.path.join(OUTPUT_DIR, "GWAS_magma")
 GWAS_ANNO_MAGMA_FILE = "magma.genes.annot"
 GWAS_ZARR_VARIANTS_TRAITS = os.path.join(OUTPUT_DIR, "GWAS_zarr", "pvalues.zarr")
-
+GWAS_CHR_BGZ_DIR = os.path.join(OUTPUT_DIR, "GWAS_chr_bgz")
 
 LOGGING = {
     'version': 1,

@@ -14,187 +14,89 @@ import struct, msgpack
 import time
 import re
 import pysam
+from backend.utils.pheno_cache import get_pheno_df, get_pheno_map
 
 logger = logging.getLogger("backend")
 
-# Optional zstd
-try:
-    import zstandard as zstd
-    USE_ZSTD = True
-    ZSTD_DECOMP = zstd.ZstdDecompressor()
-except Exception:
-    USE_ZSTD = False
-    ZSTD_DECOMP = None
 
-# Match the builder output path and naming
-LMDB_PREFIX = os.path.join("test", "lmdb_p_f32")  # shards: lmdb_p_f32_chr{chrom}(.mdb or dir)
-
-# ---------- metadata cache ----------
-
-_META = {
-    "traits": None,
-    "n_traits": None,
-    "trait_meta": None,  # phenocode -> {id, trait_group, trait_label}
-}
-
-def _open_env_any():
-    """Open any shard to read global meta. Prefer chr1 if available."""
-    # dir mode
-    path = f"{LMDB_PREFIX}_chr1"
-    return lmdb.open(path, readonly=True, lock=False, readahead=True, max_dbs=1, subdir=True), path
-
-def _load_global_meta():
-    env, path = _open_env_any()
-    if env is None:
-        raise RuntimeError("No LMDB shards found to read metadata.")
-    logger.info(f"[GWAS LMDB] reading meta from: {path}")
-
-    with env.begin() as txn:
-        for key, val in txn.cursor():
-            if key.startswith(b"__meta__"):
-                try:
-                    decoded_val = val.decode()
-                except Exception:
-                    decoded_val = val
-                logger.info(f"{key!r}: {decoded_val}")
-
-    env.close()
-
+def _to_float(s):
+    if s in (".", "NA", "", None):
+        return None
     try:
-        with env.begin() as txn:
-            traits = json.loads(txn.get(b"__meta__:traits_json").decode())
-            n_traits = int(txn.get(b"__meta__:n_traits").decode())
-        _META["traits"] = traits
-        _META["n_traits"] = n_traits
-    finally:
-        env.close()
+        return float(s)
+    except Exception:
+        return None
 
-    # phenotype metadata (labels, groups) from PHENO_FILE
-    pheno_csv = config("PHENO_FILE")
-    df = pd.read_csv(pheno_csv)
-    col_id = "id" if "id" in df.columns else "phenocode"
-    col_group = "trait_group" if "trait_group" in df.columns else ("category" if "category" in df.columns else None)
-    col_label = "trait_label" if "trait_label" in df.columns else ("description" if "description" in df.columns else None)
+def extract_variant_metrics(chr, pos, ref, alt):
+    pheno_file = config("PHENO_FILE")
+    pheno_map = get_pheno_map(pheno_file)  # cached in memory
 
-    trait_meta = {}
-    for _, row in df.iterrows():
-        code = str(row["phenocode"])
-        meta = {"id": None, "trait_group": None, "trait_label": code}
-        # id
-        try:
-            meta["id"] = int(row[col_id])
-        except Exception:
-            meta["id"] = row[col_id] if col_id in df.columns else code
-        # group
-        if col_group and pd.notna(row.get(col_group, None)):
-            meta["trait_group"] = str(row[col_group])
-        # label
-        if col_label and pd.notna(row.get(col_label, None)):
-            meta["trait_label"] = str(row[col_label])
-        trait_meta[code] = meta
-    _META["trait_meta"] = trait_meta
+    target_vid = f"{chr}:{pos}:{ref.upper()}:{alt.upper()}"
 
-# ---------- env open helpers ----------
-
-_ENV_CACHE = {}  # chrom_path -> lmdb.Environment
-
-def _open_env_for_chrom(chrom: str):
-    """Return a cached read-only env for the chromosome, or (None, None) if missing."""
-    file_path = f"{LMDB_PREFIX}_chr{chrom}.mdb"
-    dir_path = f"{LMDB_PREFIX}_chr{chrom}"
-
-    key = None
-    if os.path.exists(file_path):
-        key = file_path
-        subdir = False
-    elif os.path.isdir(dir_path):
-        key = dir_path
-        subdir = True
-    else:
-        return None, None
-
-    env = _ENV_CACHE.get(key)
-    if env is None:
-        env = lmdb.open(key, readonly=True, lock=False, readahead=True, max_dbs=1, subdir=subdir)
-        _ENV_CACHE[key] = env
-    return env, subdir
-
-# ---------- keys (p-only layout) ----------
-
-def _vkey(chrom, pos, ref, alt):
-    # single payload per variant: float32 vector length n_traits (p-only)
-    return f"{chrom}:{pos}:{ref}:{alt}".encode()
-
-# ---------- main function (p-only) ----------
-
-def extract_phenotype_results_for_variant(variant_id):
-    """
-    Return p-only results across all traits for a given variant.
-    Response:
-    {
-      "data": [ {id, trait_group, trait_label, log_pvalue, beta=None, se=None, af=None}, ... ],
-      "lastPage": null,
-      "meta": { "build": ["GRCh37"] }
+    # Paths to metric files
+    metric_files = {
+        "neg_log_pvalue": f"{settings.GWAS_CHR_BGZ_DIR}/chr{chr}/neg_log_pvalue.tsv.bgz",
+        "beta": f"{settings.GWAS_CHR_BGZ_DIR}/chr{chr}/beta.tsv.bgz",
+        "stderr_beta": f"{settings.GWAS_CHR_BGZ_DIR}/chr{chr}/stderr_beta.tsv.bgz",
+        "alt_allele_freq": f"{settings.GWAS_CHR_BGZ_DIR}/chr{chr}/alt_allele_freq.tsv.bgz",
     }
-    """
-    _load_global_meta()
-    traits = _META["traits"]
-    n_traits = _META["n_traits"]
-    trait_meta = _META["trait_meta"]
 
-    chrom, pos, ref, alt = convert_variant_id(variant_id)
-    env, _ = _open_env_for_chrom(chrom)
-    if env is None:
-        return JsonResponse({"error": f"No LMDB shard for chrom {chrom}."}, status=404)
+    # Get trait names from header
+    with pysam.TabixFile(metric_files["neg_log_pvalue"]) as tbx_p:
+        header_line = tbx_p.header[0].lstrip("#")
+        trait_names = header_line.split("\t")[5:]
+        cand_lines = list(tbx_p.fetch(chr, pos - 1, pos))
+        if not cand_lines:
+            return None
+        # Find the line with matching vid
+        p_line = next((ln for ln in cand_lines if ln.split("\t")[4] == target_vid), None)
+        if p_line is None:
+            return None
 
-    # fetch p vector
-    with env.begin() as txn:
-        payload = txn.get(_vkey(chrom, pos, ref, alt))
-        if payload is None:
-            return JsonResponse({"error": f"Variant not found {chrom}:{pos}:{ref}:{alt}."}, status=404)
-        buf = ZSTD_DECOMP.decompress(payload) if USE_ZSTD else payload
-        arr = np.frombuffer(buf, dtype=np.float32)
-        # tolerate minor mismatches
-        if arr.size < n_traits:
-            pad = np.full(n_traits - arr.size, np.nan, dtype=np.float32)
-            p_vec = np.concatenate([arr, pad], axis=0)
-        elif arr.size > n_traits:
-            p_vec = arr[:n_traits]
+    # Fetch the matching vid from each metric file
+    metric_data = {}
+    for metric_name, path in metric_files.items():
+        with pysam.TabixFile(path) as tbx:
+            lines = list(tbx.fetch(chr, pos - 1, pos))
+        match_line = next((ln for ln in lines if ln.split("\t")[4] == target_vid), None)
+        if match_line:
+            metric_data[metric_name] = match_line.split("\t")[5:]
         else:
-            p_vec = arr
+            metric_data[metric_name] = ["." for _ in trait_names]
 
-    build = config("VITE_GENOME_BUILD", default="GRCh37")
+    results = []
 
-    # build output
-    data_out = []
-    for trait_code, pv in zip(traits, p_vec):
-        if not np.isfinite(pv):
-            continue
-        meta = trait_meta.get(trait_code, {"id": None, "trait_group": None, "trait_label": trait_code})
-        data_out.append({
-            "id": meta.get("id"),
-            "trait_group": meta.get("trait_group"),
-            "trait_label": meta.get("trait_label", trait_code),
-            "log_pvalue": pv,
-            "beta": None,
-            "se": None,
-            "af": None,
+    # compute min and max allele frequency
+    af_arr = np.array([_to_float(v) for v in metric_data["alt_allele_freq"]], dtype=float)
+    mask = ~np.isnan(af_arr)
+    min_af = float(np.min(af_arr[mask])) if mask.any() else float("inf")
+    max_af = float(np.max(af_arr[mask])) if mask.any() else float("-inf")
+
+
+    for idx, trait_code in enumerate(trait_names):
+        cat, desc = pheno_map.get(trait_code, ("", trait_code))
+        results.append({
+            "id": trait_code,
+            "trait_group": cat,
+            "trait_label": desc,
+            "log_pvalue": _to_float(metric_data["neg_log_pvalue"][idx]),
+            "pvalue": np.power(10, -_to_float(metric_data["neg_log_pvalue"][idx])),
+            "beta": _to_float(metric_data["beta"][idx]),
+            "stderr_beta": _to_float(metric_data["stderr_beta"][idx]),
+            "alt_allele_freq":_to_float(metric_data["alt_allele_freq"][idx])
         })
 
-    # sort by group then by significance
-    data_out.sort(
-        key=lambda x: (
-            "" if x.get("trait_group") is None else str(x["trait_group"]),
-            -(x.get("log_pvalue") if x.get("log_pvalue") is not None else float("-inf")),
-        )
-    )
-
-    return {
-        "data": data_out,
-        "lastPage": None,
-        "meta": {"build": [build]},
-    }
-
+    results = [
+        {**r, "x": i}
+        for i, r in enumerate(sorted(
+            results,
+            key=lambda r: (
+                r["trait_group"],
+                r["log_pvalue"] if r["log_pvalue"] is not None else float("-inf")
+            )
+        ))
+    ]
+    return results, min_af, max_af
 
 def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_rows=10000):
     # Build path to gzipped/tabix-indexed GWAS file

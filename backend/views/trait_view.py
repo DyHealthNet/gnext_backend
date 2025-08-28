@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from backend.utils.extract_data_from_GWAS import extract_phenotype_results_for_variant, extract_variants_for_range
+from backend.utils.extract_data_from_GWAS import extract_variants_for_range
 from backend.utils.extract_data_from_VEP import extract_variant_annotation
 from backend.utils.converters import convert_variant_id
 from decouple import config
