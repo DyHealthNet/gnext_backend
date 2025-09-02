@@ -279,9 +279,17 @@ def get_all_sign_variants_cutoff(filename, pval_cutoff=5e-8, max_rows=10000):
             return {"error": str(e)}
 
 def stream_filtered_variants(path, cutoff="5e-8"):
-    cmd = f"zcat {path} | awk '$6 >= {cutoff}'"
-    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, text=True)
-    for line in proc.stdout:
+    # Ensure cutoff is a string representing a number
+    try:
+        float_cutoff = float(cutoff)
+    except ValueError:
+        raise ValueError(f"Invalid cutoff value: {cutoff}")
+    # Use subprocess with argument lists to avoid shell injection
+    zcat_proc = subprocess.Popen(['zcat', path], stdout=subprocess.PIPE)
+    awk_cmd = f"$6 >= {float_cutoff}"
+    awk_proc = subprocess.Popen(['awk', awk_cmd], stdin=zcat_proc.stdout, stdout=subprocess.PIPE, text=True)
+    zcat_proc.stdout.close()  # Allow zcat_proc to receive a SIGPIPE if awk_proc exits.
+    for line in awk_proc.stdout:
         yield line.strip().split("\t")
-    proc.stdout.close()
-    proc.wait()
+    awk_proc.stdout.close()
+    awk_proc.wait()
