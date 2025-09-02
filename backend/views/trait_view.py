@@ -90,7 +90,7 @@ class TraitView(generics.GenericAPIView):
             neighbor_range = int(request.GET.get("range", 0))
             chr, pos, ref, alt = convert_variant_id(varid)
             start = max(pos - neighbor_range, 0)
-            end = max(pos + neighbor_range, 0)
+            end = pos + neighbor_range
         elif chr:
             # chromosome range mode
             start = int(request.GET.get("start",0))
