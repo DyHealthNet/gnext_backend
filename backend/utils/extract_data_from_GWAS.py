@@ -236,7 +236,7 @@ def get_all_sign_variants_cutoff(filename, pval_cutoff=5e-8, max_rows=10000):
                     continue
 
                 if len(heap) < max_rows:
-                    heapq.heappush(heap, (-neg_log_pval, row))  # negatives pvalue für Max-Heap
+                    heapq.heappush(heap, (-neg_log_pval, row))  # negative pvalue for Max-Heap
                 else:
                     if neg_log_pval > -heap[0][0]:
                         heapq.heapreplace(heap, (neg_log_pval, row))
