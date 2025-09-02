@@ -149,7 +149,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
                     continue
 
                 if len(heap) < max_rows:
-                    heapq.heappush(heap, (-neg_log_pval, row))  # negatives pvalue für Max-Heap
+                    heapq.heappush(heap, (-neg_log_pval, row))  # negative pvalue for Max-Heap
                 else:
                     if neg_log_pval > -heap[0][0]:
                         heapq.heapreplace(heap, (neg_log_pval, row))
