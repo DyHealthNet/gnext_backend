@@ -151,7 +151,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
                 if len(heap) < max_rows:
                     heapq.heappush(heap, (neg_log_pval, row))  # directly store the neg_log_pval
                 else:
-                    if neg_log_pval > heap[0][0]:  # wenn aktueller Wert größer als das kleinste im Heap
+                    if neg_log_pval > heap[0][0]:  # if current value is greater than the smallest in the heap
                         heapq.heapreplace(heap, (neg_log_pval, row))
 
             rows = [dict(zip(columns, r)) for _, r in heap]
