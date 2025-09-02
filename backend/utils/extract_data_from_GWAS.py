@@ -149,10 +149,10 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
                     continue
 
                 if len(heap) < max_rows:
-                    heapq.heappush(heap, (-neg_log_pval, row))  # negative pvalue for Max-Heap
+                    heapq.heappush(heap, (neg_log_pval, row))  # direkt den neg_log_pval speichern
                 else:
-                    if neg_log_pval > -heap[0][0]:
-                        heapq.heapreplace(heap, (-neg_log_pval, row))
+                    if neg_log_pval > heap[0][0]:  # wenn aktueller Wert größer als das kleinste im Heap
+                        heapq.heapreplace(heap, (neg_log_pval, row))
 
             rows = [dict(zip(columns, r)) for _, r in heap]
             for r in rows:
@@ -223,7 +223,7 @@ def get_all_sign_variants_cutoff(filename, pval_cutoff=5e-8, max_rows=10000):
 
     with (lmdb_env.begin(buffers=True) if lmdb_env else contextlib.nullcontext()) as txn:
         try:
-            for row in stream_filtered_variants(norm_filepath, cutoff=neg_log_cutoff):
+            for row in stream_filtered_variants(norm_filepath, neg_log_cutoff=neg_log_cutoff):
                 if len(row) != len(columns):
                     logger.warning(
                         f"Length of rows ({len(row)}) does not match length of columns ({len(columns)}). Skipping malformed row: {row}")
@@ -236,10 +236,10 @@ def get_all_sign_variants_cutoff(filename, pval_cutoff=5e-8, max_rows=10000):
                     continue
 
                 if len(heap) < max_rows:
-                    heapq.heappush(heap, (-neg_log_pval, row))  # negative pvalue for Max-Heap
+                    heapq.heappush(heap, (neg_log_pval, row))  # direkt den neg_log_pval speichern
                 else:
-                    if neg_log_pval > -heap[0][0]:
-                        heapq.heapreplace(heap, (-neg_log_pval, row))
+                    if neg_log_pval > heap[0][0]:  # wenn aktueller Wert größer als das kleinste im Heap
+                        heapq.heapreplace(heap, (neg_log_pval, row))
 
             rows = [dict(zip(columns, r)) for _, r in heap]
             for r in rows:
@@ -278,15 +278,15 @@ def get_all_sign_variants_cutoff(filename, pval_cutoff=5e-8, max_rows=10000):
             logger.error(f"Error fetching all significant variants: {e}")
             return {"error": str(e)}
 
-def stream_filtered_variants(path, cutoff="5e-8"):
+def stream_filtered_variants(path, neg_log_cutoff="5e-8"):
     # Ensure cutoff is a string representing a number
     try:
-        float_cutoff = float(cutoff)
+        float_cutoff = float(neg_log_cutoff)
     except ValueError:
-        raise ValueError(f"Invalid cutoff value: {cutoff}")
+        raise ValueError(f"Invalid cutoff value: {neg_log_cutoff}")
     # Use subprocess with argument lists to avoid shell injection
     zcat_proc = subprocess.Popen(['zcat', path], stdout=subprocess.PIPE)
-    awk_cmd = f"$6 >= {float_cutoff}"
+    awk_cmd = f"NR > 1 && $6 >= {float_cutoff}"
     awk_proc = subprocess.Popen(['awk', awk_cmd], stdin=zcat_proc.stdout, stdout=subprocess.PIPE, text=True)
     zcat_proc.stdout.close()  # Allow zcat_proc to receive a SIGPIPE if awk_proc exits.
     for line in awk_proc.stdout:
