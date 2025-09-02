@@ -286,8 +286,8 @@ def stream_filtered_variants(path, neg_log_cutoff="5e-8"):
         raise ValueError(f"Invalid cutoff value: {neg_log_cutoff}")
     # Use subprocess with argument lists to avoid shell injection
     zcat_proc = subprocess.Popen(['zcat', path], stdout=subprocess.PIPE)
-    awk_cmd = f"NR > 1 && $6 >= {float_cutoff}"
-    awk_proc = subprocess.Popen(['awk', awk_cmd], stdin=zcat_proc.stdout, stdout=subprocess.PIPE, text=True)
+    awk_script = 'NR > 1 && $6 >= cutoff'
+    awk_proc = subprocess.Popen(['awk', f'-v', f'cutoff={float_cutoff}', awk_script], stdin=zcat_proc.stdout, stdout=subprocess.PIPE, text=True)
     zcat_proc.stdout.close()  # Allow zcat_proc to receive a SIGPIPE if awk_proc exits.
     for line in awk_proc.stdout:
         yield line.strip().split("\t")
