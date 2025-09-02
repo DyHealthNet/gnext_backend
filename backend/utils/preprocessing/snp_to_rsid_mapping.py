@@ -37,12 +37,6 @@ def add_rsid_to_gwas_stats(reader, output_path, genome_build='GRCh37', debug_mod
     columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta',
                'alt_allele_freq']
 
-    i = 1
-    for variant in reader:
-        i+=1
-        if i > 1:
-            break
-
     # Build new output filename with _rsid suffix (.gz is not needed as write(...,make_tabix=True) will add that autom.)
     new_output_path = output_path.replace(".gz", "_rsid")
     if not os.path.exists(new_output_path + ".gz"):
@@ -139,3 +133,8 @@ def build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, num_chroms=25):
 
     env.sync()
     env.close()
+
+def add_rsID_with_lmdb(reader, lmdb_path):
+    build = os.path.join(lmdb_path, "data.mdb")
+    rsid_finder = lookups.SnpToRsid(build, test=False)
+    reader.add_lookup('rsid', lambda variant: rsid_finder(variant.chrom, variant.pos, variant.ref, variant.alt))

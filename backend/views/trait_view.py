@@ -1,8 +1,6 @@
 from django.http import JsonResponse
-from backend.utils.extract_data_from_GWAS import extract_variants_for_range
-from backend.utils.extract_data_from_VEP import extract_variant_annotation
+from backend.utils.extract_data_from_GWAS import extract_variants_for_range, get_all_sign_variants, get_all_sign_variants_cutoff
 from backend.utils.converters import convert_variant_id
-from decouple import config
 from rest_framework import generics
 import logging
 import re
@@ -82,27 +80,38 @@ class TraitView(generics.GenericAPIView):
         else:
             pval_cutoff = float(request.GET.get("pval_cutoff", 1.0))
 
-        # rsid mode
         varid = request.GET.get("varid")
-        neighbor_range = int(request.GET.get("range", 0))
+        chr = request.GET.get("chr")
+        start = -1
+        end = -1
 
         if varid:
+            # rsid mode
+            neighbor_range = int(request.GET.get("range", 0))
             chr, pos, ref, alt = convert_variant_id(varid)
             start = max(pos - neighbor_range, 0)
-            end = pos + neighbor_range
-        else:
+            end = max(pos + neighbor_range, 0)
+        elif chr:
             # chromosome range mode
-            chr = request.GET.get("chr")
             start = int(request.GET.get("start",0))
             end = int(request.GET.get("end",0))
 
-        logger.info(f"Received request with trait: {trait}")
+
+        logger.info(f"Received trait request with trait: {trait}")
         pheno_info = get_phenotype_from_typesense(trait)
         file_name = pheno_info['filename'] if pheno_info else None
         if not file_name:
             return JsonResponse({"error": "Trait not found"}, status=404)
 
-        data = extract_variants_for_range(file_name, chr, start, end, pval_cutoff=pval_cutoff)
+        if start >= 0:
+            data = extract_variants_for_range(file_name, chr, start, end, pval_cutoff=pval_cutoff)
+        else:
+            data = get_all_sign_variants_cutoff(file_name, pval_cutoff=pval_cutoff)
+            # get_all_sign_variants_cutoff pval 0.01 ~14s (trait 30830)
+            # get_all_sign_variants_cutoff pval 0.05 ~14s (trait 30830)
+            # get_all_sign_variants_cutoff pval 1.0 ~30s (trait 30830)
+            # get_all_sign_variants pval 0.01 ~44s (trait 30830)
+            # get_all_sign_variants pval 0.05 ~54s(trait 30830)
 
         if data is None:
             return JsonResponse({"error": "No variants found for the given trait."}, status=404)
@@ -118,7 +127,7 @@ class ChromosomeBoundsView(generics.GenericAPIView):
         """
         start_time = time.time()
         trait = request.GET.get("trait")
-        logger.info(f"Received request with trait: {trait}")
+        logger.info(f"Received chromosome request with trait: {trait}")
         pheno_info = get_phenotype_from_typesense(trait)
         file_name = pheno_info['filename'] if pheno_info else None
         if not file_name:

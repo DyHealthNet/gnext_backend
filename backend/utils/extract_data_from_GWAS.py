@@ -12,9 +12,15 @@ import logging
 import contextlib
 import struct, msgpack
 import time
+import math
 import re
 import pysam
+import heapq
+import itertools
+import subprocess
 from backend.utils.pheno_cache import get_pheno_df, get_pheno_map
+from backend.utils.preprocessing.zorp.zorp import sniffers
+from backend.utils.preprocessing.snp_to_rsid_mapping import add_rsID_with_lmdb
 
 logger = logging.getLogger("backend")
 
@@ -130,7 +136,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
         lmdb_env = None
 
     tabix_file = pysam.TabixFile(norm_filepath)
-    columns = ['rsid', 'chrom', 'pos', 'ref', 'alt', 'neg_log_pvalue',
+    columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue',
                'pvalue', 'beta', 'stderr_beta', 'alt_allele_freq']
 
     with (lmdb_env.begin(buffers=True) if lmdb_env else contextlib.nullcontext()) as txn:
@@ -220,4 +226,279 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
 
         except Exception as e:
             logger.error(f"Error fetching data for {chr}:{start}-{end}: {e}")
+            return {"error": str(e)}
+
+def get_all_sign_variants_reader(filename, pval_cutoff=0.01, max_rows=10000):
+    norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(filename))
+    norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
+    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_{config('VITE_GENOME_BUILD')}")
+
+    reader = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
+
+    neg_log_cutoff = -math.log10(pval_cutoff)
+
+    start_time = time.time()
+    add_rsID_with_lmdb(reader, lmdb_path)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.debug(f"FINISHED adding rsid in {elapsed_time:.2f} seconds")
+
+    columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue',
+               'pvalue', 'beta', 'stderr_beta', 'alt_allele_freq']
+
+    # Use streaming, stop at max_rows
+    start_time = time.time()
+    heap = []  # min-heap
+    logger.debug(f"I am here")
+    count = 0
+    counter = itertools.count()  # tie-breaker
+    for row in reader:
+        if row.neg_log_pvalue < neg_log_cutoff:
+            continue
+        row_dict = {
+            "chrom": row.chrom,
+            "pos": row.pos,
+            "rsid": row.rsid,
+            "ref": row.ref,
+            "alt": row.alt,
+            "neg_log_pvalue": row.neg_log_pvalue,
+            "pvalue": row.pvalue,
+            "beta": row.beta,
+            "stderr_beta": row.stderr_beta,
+            "alt_allele_freq": row.alt_allele_freq,
+            "variant_id": f"{row.chrom}_{row.pos}_{row.ref}/{row.alt}",
+        }
+        heapq.heappush(heap, (row.neg_log_pvalue, next(counter), row_dict))
+        if len(heap) > max_rows:
+            heapq.heappop(heap)  # remove the smallest in heap
+
+    logger.debug(f"And here")
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.debug(f"FINISHED converting variant rows to dict in {elapsed_time:.2f} seconds")
+
+    data = {
+        "header": ["variant_id"] + columns,
+        "rows": rows,
+    }
+
+    return data
+
+def get_all_sign_variants_pandas(filename, pval_cutoff=0.05, max_rows=10000):
+    # Build normalized filepath
+    norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(filename))
+    norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
+    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_{config('VITE_GENOME_BUILD')}")
+
+    # Initialize reader
+    reader = sniffers.guess_gwas_standard(norm_filepath)
+    add_rsID_with_lmdb(reader, lmdb_path)  # add RSID mapping
+
+    # Convert all rows to pandas DataFrame
+    df = reader.to_pandas()
+
+    # Apply cutoff filter
+    neg_log_cutoff = -math.log10(pval_cutoff)
+    df = df[df['neg_log_pvalue'] >= neg_log_cutoff]
+
+    # Build variant_id
+    df['variant_id'] = df['chrom'].astype(str) + "_" + df['pos'].astype(str) + "_" + df['ref'] + "/" + df['alt']
+
+    # Fix rsid formatting
+    df['rsid'] = 'rs' + df['rsid'].astype(str)
+
+    # Limit number of rows
+    df = df.head(max_rows)
+
+    # Prepare output
+    columns = ['chrom', 'pos', 'rsid', 'ref', 'alt',
+               'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta', 'alt_allele_freq']
+
+    data = {
+        "header": ["variant_id"] + columns,
+        "rows": df[["variant_id"] + columns].to_dict(orient="records"),
+        "location": df['pos'].tolist(),
+        "ref": df['ref'].tolist(),
+        "alt": df['alt'].tolist(),
+        "external_ids": df['rsid'].tolist(),
+        "allele_frequencies": df['alt_allele_freq'].replace('.', None).astype(float).tolist()
+    }
+
+    return data
+
+def get_all_sign_variants_cutoff(filename, pval_cutoff=5e-8, max_rows=10000):
+    # Normalize filename
+    norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(filename))
+    norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
+
+    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
+    db_handles = {}
+
+    heap = []
+    counter = itertools.count()
+
+    try:
+        lmdb_env = lmdb.open(
+            lmdb_path,
+            map_size=1024 ** 4,
+            max_dbs=25,
+            readonly=True,
+            lock=False,
+            readahead=True,
+            subdir=False
+        )
+    except Exception:
+        lmdb_env = None
+
+    columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue',
+               'pvalue', 'beta', 'stderr_beta', 'alt_allele_freq']
+    col_idx = {name: i for i, name in enumerate(columns)}
+    idx_pval = col_idx['pvalue']
+
+    with (lmdb_env.begin(buffers=True) if lmdb_env else contextlib.nullcontext()) as txn:
+        try:
+            for row in stream_filtered_variants(norm_filepath, cutoff=pval_cutoff):
+                if len(row) != len(columns):
+                    logger.warning(
+                        f"Length of rows ({len(row)}) does not match length of columns ({len(columns)}). Skipping malformed row: {row}")
+                    continue
+
+                pvalue = float(row[idx_pval]) if row[idx_pval] != "." else None
+                if pvalue is None or pvalue > pval_cutoff:
+                    continue
+
+                if len(heap) < max_rows:
+                    heapq.heappush(heap, (-pvalue, row))  # negatives pvalue für Max-Heap
+                else:
+                    if pvalue < -heap[0][0]:
+                        heapq.heapreplace(heap, (-pvalue, row))
+
+            rows = [dict(zip(columns, r)) for _, r in heap]
+            for r in rows:
+
+                pos = r['pos']
+                chr = r['chrom']
+                ref = r['ref']
+                alt = r['alt']
+
+                r['variant_id'] = f"{chr}_{pos}_{ref}/{alt}"
+
+                if lmdb_env and txn:
+                    if chr not in db_handles:
+                        db_handles[chr] = lmdb_env.open_db(chr.encode(), txn=txn)
+                    db = db_handles[chr]
+
+                    # Lookup RSID using LMDB
+                    if db:
+                        key_bytes = struct.pack('I', int(pos))
+                        value_bytes = txn.get(key_bytes, db=db)
+                        if value_bytes:
+                            refalt_to_rsid = msgpack.unpackb(value_bytes, raw=False)
+                            refalt = f"{ref}/{alt}"
+                            rsid_int = refalt_to_rsid.get(refalt)
+                            if rsid_int is not None:
+                                r['rsid'] = f"rs{rsid_int}"
+
+            data = {
+                "header": ['variant_id'] + columns,
+                "rows": rows,
+            }
+
+            return data
+
+        except Exception as e:
+            logger.error(f"Error fetching all significant variants: {e}")
+            return {"error": str(e)}
+
+def stream_filtered_variants(path, cutoff="5e-8"):
+    cmd = f"zcat {path} | awk '$7 <= {cutoff}'"
+    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, text=True)
+    for line in proc.stdout:
+        yield line.strip().split("\t")
+    proc.stdout.close()
+    proc.wait()
+
+def get_all_sign_variants(filename, pval_cutoff=0.1, max_rows=10000):
+    # Build path to gzipped/tabix-indexed GWAS file
+    norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(filename))
+    norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
+
+    heap = []
+    counter = itertools.count()
+
+    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
+    db_handles = {}
+
+    try:
+        lmdb_env = lmdb.open(
+            lmdb_path,
+            map_size=1024 ** 4,
+            max_dbs=25,
+            readonly=True,
+            lock=False,
+            readahead=True,
+            subdir=False
+        )
+        logger.debug("LMDB environment opened")
+    except Exception as e:
+        logger.warning(f"LMDB not available, RSIDs will not be updated: {e}")
+        lmdb_env = None
+
+    tabix_file = pysam.TabixFile(norm_filepath)
+    columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue',
+               'pvalue', 'beta', 'stderr_beta', 'alt_allele_freq']
+    col_idx = {name: i for i, name in enumerate(columns)}
+
+    with (lmdb_env.begin(buffers=True) if lmdb_env else contextlib.nullcontext()) as txn:
+        try:
+            for row in tabix_file.fetch():
+                row = row.split("\t")
+                if len(row) != len(columns):
+                    logger.warning(
+                        f"Length of rows ({len(row)}) does not match length of columns ({len(columns)}). Skipping malformed row: {row}")
+                    continue
+
+                pvalue = float(row[col_idx['pvalue']]) if row[col_idx['pvalue']] != "." else None
+                if pvalue is None or pvalue > pval_cutoff:
+                    continue
+
+                heapq.heappush(heap, (pvalue, next(counter), row))
+
+            rows = [
+                dict(zip(columns, item[2])) for item in heapq.nsmallest(max_rows, heap)
+            ]
+            for r in rows:
+
+                pos = r['pos']
+                chr = r['chrom']
+                ref = r['ref']
+                alt = r['alt']
+
+                r['variant_id'] = chr + "_" + pos + "_" + ref + "/" + alt
+
+                if lmdb_env and txn:
+                    if chr not in db_handles:
+                        db_handles[chr] = lmdb_env.open_db(chr.encode(), txn=txn)
+                    db = db_handles[chr]
+
+                    # Lookup RSID using LMDB
+                    if db:
+                        key_bytes = struct.pack('I', int(pos))
+                        value_bytes = txn.get(key_bytes, db=db)
+                        if value_bytes:
+                            refalt_to_rsid = msgpack.unpackb(value_bytes, raw=False)
+                            refalt = f"{ref}/{alt}"
+                            rsid_int = refalt_to_rsid.get(refalt)
+                            if rsid_int is not None:
+                                r['rsid'] = f"rs{rsid_int}"
+
+            data = {
+                "header": ['variant_id'] + columns,
+                "rows": rows,
+            }
+
+            return data
+
+        except Exception as e:
+            logger.error(f"Error fetching all significant variants: {e}")
             return {"error": str(e)}
