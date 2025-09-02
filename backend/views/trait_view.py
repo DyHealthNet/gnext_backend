@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from backend.utils.extract_data_from_GWAS import extract_variants_for_range, get_all_sign_variants, get_all_sign_variants_cutoff
+from backend.utils.extract_data_from_GWAS import extract_variants_for_range, get_all_sign_variants_cutoff
 from backend.utils.converters import convert_variant_id
 from rest_framework import generics
 import logging
