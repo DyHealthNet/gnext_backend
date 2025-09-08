@@ -160,7 +160,8 @@ class ChromosomeBoundsView(generics.GenericAPIView):
                         bounds[chrom] = {"min": min_pos, "max": max_pos}
 
                 except lmdb.Error as e:
-                    # Skip chromosomes that don’t exist
+                    logger.warning(f"LMDB error for chromosome {chrom}: {e}")
+                    # Skip chromosomes that don’t exist or other LMDB errors
                     continue
 
         end_time = time.time()
