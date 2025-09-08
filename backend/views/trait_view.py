@@ -135,7 +135,7 @@ class ChromosomeBoundsView(generics.GenericAPIView):
             )
             logger.debug("LMDB environment opened")
         except Exception as e:
-            logger.warning(f"LMDB not available, RSIDs will not be updated: {e}")
+            logger.warning(f"LMDB not available, chromosome bounds cannot be retrieved: {e}")
             lmdb_env = None
 
         bounds = {}
