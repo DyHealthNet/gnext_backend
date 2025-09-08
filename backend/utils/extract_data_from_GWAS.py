@@ -130,7 +130,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
         lmdb_env = None
 
     tabix_file = pysam.TabixFile(norm_filepath)
-    columns = ['rsid', 'chrom', 'pos', 'ref', 'alt', 'neg_log_pvalue',
+    columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue',
                'pvalue', 'beta', 'stderr_beta', 'alt_allele_freq']
 
     with (lmdb_env.begin(buffers=True) if lmdb_env else contextlib.nullcontext()) as txn:
