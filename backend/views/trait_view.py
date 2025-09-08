@@ -122,7 +122,6 @@ class ChromosomeBoundsView(generics.GenericAPIView):
         """
         start_time = time.time()
         lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_sorted_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
-        db_handles = {}
 
         try:
             lmdb_env = lmdb.open(
