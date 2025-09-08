@@ -116,10 +116,10 @@ class ChromosomeBoundsView(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         """
-            #     Handles GET requests to retrieve the minimum and maximum position bounds for each chromosome
-            #     in the GWAS file associated with a given trait. Returns a dictionary mapping chromosome names
-            #     to their position bounds (min and max).
-            #     """
+        Handles GET requests to retrieve the minimum and maximum position bounds for each chromosome
+        in the GWAS file associated with a given trait. Returns a dictionary mapping chromosome names
+        to their position bounds (min and max).
+        """
         start_time = time.time()
         lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_sorted_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
         db_handles = {}
