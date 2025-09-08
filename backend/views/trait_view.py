@@ -190,29 +190,3 @@ class ChromosomeBoundsView(generics.GenericAPIView):
     #     try:
     #         tabix_file = pysam.TabixFile(norm_filepath)
     #     except Exception as e:
-    #         logger.error(f"Error opening Tabix file {norm_filepath}: {e}")
-    #         return JsonResponse({"error": "Failed to open GWAS file"}, status=500)
-    #
-    #     bounds = {}
-    #     for chrom in tabix_file.contigs:
-    #         try:
-    #             # Fetch the first record
-    #             first = next(tabix_file.fetch(chrom))
-    #             min_pos = int(first.split("\t")[1])
-    #
-    #             # Fetch the last record by iterating from the end (pysam doesn’t have direct last fetch, but can use reversed iterator)
-    #             last = None
-    #             for last in tabix_file.fetch(chrom):
-    #                 pass
-    #             max_pos = int(last.split("\t")[1]) if last else min_pos
-    #
-    #             bounds[chrom] = {"min": min_pos, "max": max_pos}
-    #         except (StopIteration, ValueError):
-    #             # chromosome has no records
-    #             continue
-    #
-    #     end_time = time.time()
-    #     elapsed_time = end_time - start_time
-    #     logger.debug(f"FINISHED FILTERING in {elapsed_time:.2f} seconds for getting the chromosome bounds")
-    #
-    #     return JsonResponse(bounds, safe=False)
