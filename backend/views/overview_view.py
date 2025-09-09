@@ -24,7 +24,7 @@ class OverviewDataView(generics.GenericAPIView):
 class TopHitsView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         """
-        Handles GET requests to the Manhattan API.
+        Handles GET requests to retrieve top hits data from a JSON file and returns it as a JSON response.
         """
         GWAS_norm_dir = settings.GWAS_NORM_DIR
         top_hits_file = os.path.join(GWAS_norm_dir, "top_hits.json")
