@@ -9,6 +9,9 @@ from django.conf import settings
 import os
 import time
 import pysam
+import struct
+import lmdb
+import contextlib
 
 
 from backend.utils.typesense_client import get_phenotype_from_typesense
@@ -119,6 +122,7 @@ class TraitView(generics.GenericAPIView):
             return JsonResponse(data)
 
 class ChromosomeBoundsView(generics.GenericAPIView):
+
     def get(self, request, *args, **kwargs):
         """
         Handles GET requests to retrieve the minimum and maximum position bounds for each chromosome
@@ -135,33 +139,72 @@ class ChromosomeBoundsView(generics.GenericAPIView):
 
         norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(file_name))
         norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
+        lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_sorted_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
 
         try:
-            tabix_file = pysam.TabixFile(norm_filepath)
+            lmdb_env = lmdb.open(
+                lmdb_path,
+                map_size=1024 ** 4,
+                max_dbs=25,
+                readonly=True,
+                lock=False,
+                readahead=True,
+                subdir=False
+            )
+            logger.debug("LMDB environment opened")
         except Exception as e:
-            logger.error(f"Error opening Tabix file {norm_filepath}: {e}")
-            return JsonResponse({"error": "Failed to open GWAS file"}, status=500)
+            logger.warning(f"LMDB not available, chromosome bounds cannot be retrieved: {e}")
+            lmdb_env = None
 
         bounds = {}
-        for chrom in tabix_file.contigs:
-            try:
-                # Fetch the first record
-                first = next(tabix_file.fetch(chrom))
-                min_pos = int(first.split("\t")[1])
 
-                # Fetch the last record by iterating from the end (pysam doesn’t have direct last fetch, but can use reversed iterator)
-                last = None
-                for last in tabix_file.fetch(chrom):
-                    pass
-                max_pos = int(last.split("\t")[1]) if last else min_pos
+        # Open a read-only transaction
+        with (lmdb_env.begin(buffers=True) if lmdb_env else contextlib.nullcontext()) as txn:
+            # Iterate over chromosomes you care about
+            for chrom in [str(i) for i in range(1, 23)] + ["X", "Y"]:
+                try:
+                    # Open DB handle for chromosome
+                    db = lmdb_env.open_db(chrom.encode(), txn=txn)
+                    cursor = txn.cursor(db)
 
-                bounds[chrom] = {"min": min_pos, "max": max_pos}
-            except (StopIteration, ValueError):
-                # chromosome has no records
-                continue
+                    # Get first key
+                    if cursor.first():
+                        min_pos = struct.unpack('>I', cursor.key())[0]
+
+                        # Get last key
+                        cursor.last()
+                        max_pos = struct.unpack('>I', cursor.key())[0]
+
+                        bounds[chrom] = {"min": min_pos, "max": max_pos}
+
+                except lmdb.Error as e:
+                    logger.warning(f"LMDB error for chromosome {chrom}: {e}")
+                    # Skip chromosomes that don’t exist or other LMDB errors
+                    continue
 
         end_time = time.time()
         elapsed_time = end_time - start_time
         logger.debug(f"FINISHED FILTERING in {elapsed_time:.2f} seconds for getting the chromosome bounds")
 
         return JsonResponse(bounds, safe=False)
+
+    # def get(self, request, *args, **kwargs):
+    #     """
+    #     Handles GET requests to retrieve the minimum and maximum position bounds for each chromosome
+    #     in the GWAS file associated with a given trait. Returns a dictionary mapping chromosome names
+    #     to their position bounds (min and max).
+    #     """
+    #     start_time = time.time()
+    #     trait = request.GET.get("trait")
+    #     logger.info(f"Received request with trait: {trait}")
+    #     pheno_info = get_phenotype_from_typesense(trait)
+    #     file_name = pheno_info['filename'] if pheno_info else None
+    #     if not file_name:
+    #         return JsonResponse({"error": "Trait not found"}, status=404)
+    #
+    #     norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(file_name))
+    #     norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
+    #
+    #     try:
+    #         tabix_file = pysam.TabixFile(norm_filepath)
+    #     except Exception as e:

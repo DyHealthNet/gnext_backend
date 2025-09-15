@@ -6,7 +6,7 @@
 #SBATCH --error=logging/%x_%j.err
 #SBATCH --output=logging/%x.%j.log
 #SBATCH --mem=64G
-#SBATCH --array=3-22
+#SBATCH --array=1-22
 #SBATCH --partition=slow-mc2
 
 # Configure paths

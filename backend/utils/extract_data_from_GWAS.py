@@ -78,11 +78,11 @@ def extract_variant_metrics(chr, pos, ref, alt):
     min_af = float(np.min(af_arr[mask])) if mask.any() else float("inf")
     max_af = float(np.max(af_arr[mask])) if mask.any() else float("-inf")
 
-
     for idx, trait_code in enumerate(trait_names):
         cat, desc = pheno_map.get(trait_code, ("", trait_code))
         results.append({
             "id": trait_code,
+            "x": idx,
             "trait_group": cat,
             "trait_label": desc,
             "log_pvalue": _to_float(metric_data["neg_log_pvalue"][idx]),
@@ -92,16 +92,16 @@ def extract_variant_metrics(chr, pos, ref, alt):
             "alt_allele_freq":_to_float(metric_data["alt_allele_freq"][idx])
         })
 
-    results = [
-        {**r, "x": i}
-        for i, r in enumerate(sorted(
-            results,
-            key=lambda r: (
-                r["trait_group"],
-                r["log_pvalue"] if r["log_pvalue"] is not None else float("-inf")
-            )
-        ))
-    ]
+    # results = [
+    #     {**r, "x": i}
+    #     for i, r in enumerate(sorted(
+    #         results,
+    #         key=lambda r: (
+    #             r["trait_group"],
+    #             -r["log_pvalue"] if r["log_pvalue"] is not None else float("-inf")
+    #         )
+    #     ))
+    # ]
     return results, min_af, max_af
 
 def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_rows=10000):
@@ -109,7 +109,15 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
     norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(filename))
     norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
 
-    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
+    # Initialize containers
+    rows = []
+    location = []
+    ref = []
+    alt = []
+    external_ids = []
+    allele_frequencies = []
+
+    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_sorted_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
     db_handles = {}
 
     heap = []
@@ -259,6 +267,7 @@ def get_all_sign_variants_cutoff(filename, pval_cutoff=5e-8, max_rows=10000):
                     # Lookup RSID using LMDB
                     if db:
                         key_bytes = struct.pack('I', int(pos))
+                        #key_bytes = struct.pack('>I', pos)
                         value_bytes = txn.get(key_bytes, db=db)
                         if value_bytes:
                             refalt_to_rsid = msgpack.unpackb(value_bytes, raw=False)

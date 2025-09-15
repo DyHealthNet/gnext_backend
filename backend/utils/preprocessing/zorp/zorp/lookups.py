@@ -57,7 +57,7 @@ class SnpToRsid:
 
         db = self.db_handles[chrom]
 
-        key = struct.pack('I', int(pos))
+        key = struct.pack('>I', int(pos))
         with self.env.begin(buffers=True) as txn:
             res = txn.get(key, db=db)
             if res:  # If there is a match for this position, find any matching ref/alts

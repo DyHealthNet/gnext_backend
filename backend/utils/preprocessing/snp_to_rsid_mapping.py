@@ -57,7 +57,7 @@ def add_rsid_to_gwas_stats(reader, output_path, genome_build='GRCh37', debug_mod
 
         
 def setup_rsid_mapping_lmdb(vcf_path, dir_path, num_chroms=25, map_size=10 ** 9):
-    lmdb_path = dir_path + "/lmdb_" + config('VITE_GENOME_BUILD')
+    lmdb_path = dir_path + "/lmdb_sorted_" + config('VITE_GENOME_BUILD')
     # Only build the LMDB if it doesn't exist or is missing required files
     if not os.path.isdir(lmdb_path) or not os.path.exists(os.path.join(lmdb_path, "data.mdb")):
         logger.info("LMDB not found, creating...")
@@ -127,7 +127,7 @@ def build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, num_chroms=25):
 
             # If we found any ref/alt mappings for this position, store in LMDB
             if refalt_to_rsid:
-                key_bytes = struct.pack('I', pos)  # pack position as 4-byte int
+                key_bytes = struct.pack('>I', pos)  # pack position as 4-byte int
                 value_bytes = msgpack.packb(refalt_to_rsid, use_bin_type=True)
                 txn.put(key_bytes, value_bytes, db=db)
 
