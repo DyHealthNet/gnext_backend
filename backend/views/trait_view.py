@@ -6,6 +6,7 @@ import logging
 import re
 import json
 from django.conf import settings
+from decouple import config
 import os
 import time
 import pysam
