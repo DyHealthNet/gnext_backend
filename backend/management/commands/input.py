@@ -15,7 +15,7 @@ from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
-from backend.utils.preprocessing.snp_to_rsid_mapping import setup_rsid_mapping_lmdb, map_and_write_rsid
+from backend.utils.preprocessing.snp_to_rsid_mapping import setup_rsid_mapping_lmdb, add_rsID_with_lmdb
 from backend.utils.preprocessing.locuszoom import manhattan, qq
 from backend.utils.preprocessing.zorp.zorp import parsers, sniffers, readers, lookups
 from backend.utils.preprocessing.magma.magma import read_magma_config
@@ -31,6 +31,7 @@ class Command(BaseCommand):
            self.generate_manhattan_qq_magma_files()
            if settings.MAGMA_ENABLED:
                   self.prepare_MAGMA_mapping_input()
+           self.generate_top_hits()
            logger.info("Finished generation of Manhattan, QQ%s!" % (" and MAGMA input files" if settings.MAGMA_ENABLED else " files"))
        except Exception as e:
            # print stack trace
@@ -106,7 +107,7 @@ class Command(BaseCommand):
         if not os.path.exists(manhattan_filepath):
             logger.info("Started Manhattan JSON file generation of GWAS file: %s", norm_filepath)
             reader_for_manhattan = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
-            Command.add_rsID_with_lmdb(reader_for_manhattan, lmdb_path)
+            add_rsID_with_lmdb(reader_for_manhattan, lmdb_path)
             Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
             logger.info("COMPLETED: Manhattan JSON file generation of GWAS file: %s", norm_filepath)
         else:
@@ -127,7 +128,7 @@ class Command(BaseCommand):
             if not os.path.exists(magma_filepath):
                 logger.info("Started MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
                 reader_for_magma = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
-                Command.add_rsID_with_lmdb(reader_for_magma, lmdb_path)
+                add_rsID_with_lmdb(reader_for_magma, lmdb_path)
                 Command.generate_magma_input(reader_for_magma, magma_filepath, lmdb_path)
                 logger.info("COMPLETED: MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
             else:
@@ -311,3 +312,75 @@ class Command(BaseCommand):
         rsid_finder = lookups.SnpToRsid(build, test=False)
         reader.add_lookup('rsid', lambda variant: rsid_finder(variant.chrom, variant.pos, variant.ref, variant.alt))
 
+    @staticmethod
+    def generate_top_hits(pval_cutoff = 1e-6, max_limit = 10000):
+        """
+        Generate a global top hits table across all phenotypes.
+        Saves to GWAS_norm_dir/top_hits.json
+        """
+        pheno_file = config("PHENO_FILE")
+        GWAS_norm_dir = settings.GWAS_NORM_DIR
+        GWAS_manhattan_dir = settings.GWAS_MANHATTAN_DIR
+        outpath = os.path.join(GWAS_norm_dir, "top_hits.json")
+
+        if not os.path.exists(outpath):
+            pheno_dt = pd.read_csv(pheno_file)
+            phenos = pheno_dt.to_dict(orient="records")
+
+            hits = []
+            for pheno in phenos:
+                hits.extend(get_hits(pheno, GWAS_manhattan_dir, pval_cutoff))
+
+            # Sort by p-value ascending, keep top N
+            hits.sort(key=lambda h: h["neg_log_pvalue"], reverse=True)
+            hits = hits[:max_limit]
+
+            # Keep only a subset of useful columns
+            # cleaned_hits = [
+            #     {k: hit.get(k) for k in ["category", "description", "pos", "pvalue", "phenocode", "top_variant", "category"]}
+            #     for hit in hits
+            # ]
+
+            with open(outpath, "w") as f:
+                json.dump(hits, f, indent=2)
+
+            return hits
+
+        return
+
+def get_hits(pheno, GWAS_manhattan_dir, pval_cutoff):
+    """
+    Collect best variant per peak for a given phenotype.
+    """
+    norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(pheno["filename"]))
+    manhattan_filepath = os.path.join(GWAS_manhattan_dir, norm_filename + "_manhattan.json")
+
+    with open(manhattan_filepath) as f:
+        variants = json.load(f)["unbinned_variants"]
+
+    # Group by peak, keep lowest pvalue
+    peak_to_best = {}
+    for v in variants:
+        if v.get("pvalue", 1.0) <= pval_cutoff and v.get("peak", False):
+            # use chromosome+position as unique key
+            key = (v["chrom"], v["pos"])
+            best = peak_to_best.get(key)
+            if best is None or v["pvalue"] < best["pvalue"]:
+                v["phenocode"] = pheno["phenocode"]
+                chrom = v["chrom"]
+                pos = v["pos"]
+                ref = v.get("ref", "")
+                alt = v.get("alt", "")
+                rsid = v.get("rsid")
+                if rsid and rsid != ".":
+                    v["top_variant"] = f"{chrom}_{pos}_{ref}/{alt} ({rsid})"
+                else:
+                    v["top_variant"] = f"{chrom}_{pos}_{ref}/{alt}"
+                alt_allele_freq = v.get("alt_allele_freq")
+                v["MAF"] = min(float(alt_allele_freq), 1 - float(alt_allele_freq)) if alt_allele_freq else None
+                for k in ["description", "category"]:
+                    if k in pheno:
+                        v[k] = pheno[k]
+                peak_to_best[key] = v
+
+    yield from peak_to_best.values()

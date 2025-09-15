@@ -37,12 +37,6 @@ def add_rsid_to_gwas_stats(reader, output_path, genome_build='GRCh37', debug_mod
     columns = ['chrom', 'pos', 'rsid', 'ref', 'alt', 'neg_log_pvalue', 'pvalue', 'beta', 'stderr_beta',
                'alt_allele_freq']
 
-    i = 1
-    for variant in reader:
-        i+=1
-        if i > 1:
-            break
-
     # Build new output filename with _rsid suffix (.gz is not needed as write(...,make_tabix=True) will add that autom.)
     new_output_path = output_path.replace(".gz", "_rsid")
     if not os.path.exists(new_output_path + ".gz"):
@@ -63,7 +57,7 @@ def add_rsid_to_gwas_stats(reader, output_path, genome_build='GRCh37', debug_mod
 
         
 def setup_rsid_mapping_lmdb(vcf_path, dir_path, num_chroms=25, map_size=10 ** 9):
-    lmdb_path = dir_path + "/lmdb_" + config('VITE_GENOME_BUILD')
+    lmdb_path = dir_path + "/lmdb_sorted_" + config('VITE_GENOME_BUILD')
     # Only build the LMDB if it doesn't exist or is missing required files
     if not os.path.isdir(lmdb_path) or not os.path.exists(os.path.join(lmdb_path, "data.mdb")):
         logger.info("LMDB not found, creating...")
@@ -133,9 +127,14 @@ def build_snp_map_lmdb_from_vcf(vcf_path, lmdb_path, num_chroms=25):
 
             # If we found any ref/alt mappings for this position, store in LMDB
             if refalt_to_rsid:
-                key_bytes = struct.pack('I', pos)  # pack position as 4-byte int
+                key_bytes = struct.pack('>I', pos)  # pack position as 4-byte int
                 value_bytes = msgpack.packb(refalt_to_rsid, use_bin_type=True)
                 txn.put(key_bytes, value_bytes, db=db)
 
     env.sync()
     env.close()
+
+def add_rsID_with_lmdb(reader, lmdb_path):
+    build = os.path.join(lmdb_path, "data.mdb")
+    rsid_finder = lookups.SnpToRsid(build, test=False)
+    reader.add_lookup('rsid', lambda variant: rsid_finder(variant.chrom, variant.pos, variant.ref, variant.alt))
