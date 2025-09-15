@@ -15,6 +15,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN python -m pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir gunicorn
+
 
 # App source
 COPY . .
@@ -33,4 +35,5 @@ EXPOSE 8000
 ENV DJANGO_SETTINGS_MODULE=dyhealthnetlight.settings
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
+
 CMD ["gunicorn", "dyhealthnetlight.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

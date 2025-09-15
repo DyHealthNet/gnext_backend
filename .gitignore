@@ -178,3 +178,4 @@ data/
 .env
 .idea/
 db.sqlite3
+slurm_scripts/logging/
