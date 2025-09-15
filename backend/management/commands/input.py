@@ -15,7 +15,7 @@ from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
-from backend.utils.preprocessing.snp_to_rsid_mapping import setup_rsid_mapping_lmdb, map_and_write_rsid
+from backend.utils.preprocessing.snp_to_rsid_mapping import setup_rsid_mapping_lmdb, add_rsID_with_lmdb
 from backend.utils.preprocessing.locuszoom import manhattan, qq
 from backend.utils.preprocessing.zorp.zorp import parsers, sniffers, readers, lookups
 from backend.utils.preprocessing.magma.magma import read_magma_config
@@ -107,7 +107,7 @@ class Command(BaseCommand):
         if not os.path.exists(manhattan_filepath):
             logger.info("Started Manhattan JSON file generation of GWAS file: %s", norm_filepath)
             reader_for_manhattan = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
-            Command.add_rsID_with_lmdb(reader_for_manhattan, lmdb_path)
+            add_rsID_with_lmdb(reader_for_manhattan, lmdb_path)
             Command.generate_manhattan(reader_for_manhattan, manhattan_filepath)
             logger.info("COMPLETED: Manhattan JSON file generation of GWAS file: %s", norm_filepath)
         else:
@@ -128,7 +128,7 @@ class Command(BaseCommand):
             if not os.path.exists(magma_filepath):
                 logger.info("Started MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
                 reader_for_magma = sniffers.guess_gwas_standard(norm_filepath).add_filter('neg_log_pvalue')
-                Command.add_rsID_with_lmdb(reader_for_magma, lmdb_path)
+                add_rsID_with_lmdb(reader_for_magma, lmdb_path)
                 Command.generate_magma_input(reader_for_magma, magma_filepath, lmdb_path)
                 logger.info("COMPLETED: MAGMA normalized input file generation of GWAS file: %s", norm_filepath)
             else:
@@ -384,7 +384,3 @@ def get_hits(pheno, GWAS_manhattan_dir, pval_cutoff):
                 peak_to_best[key] = v
 
     yield from peak_to_best.values()
-
-
-
-
