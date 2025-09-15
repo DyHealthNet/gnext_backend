@@ -179,7 +179,7 @@ def main(source_fn: str, out_fn: str, n_chroms=25, sample_regions=None):
 
         for chrom, position, position_contents in group_iterator:
             # Value is not a primitive; serialize it efficiently
-            key = struct.pack('I', position)
+            key = struct.pack('>I', position)
             value = msgpack.packb(position_contents, use_bin_type=True)
             txn.put(key, value, db=db_handles[chrom])
 

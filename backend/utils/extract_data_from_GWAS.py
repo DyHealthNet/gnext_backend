@@ -111,7 +111,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
     external_ids = []
     allele_frequencies = []
 
-    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
+    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_sorted_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
     db_handles = {}
 
     try:
@@ -165,7 +165,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
 
                     # Lookup RSID using LMDB
                     if db:
-                        key_bytes = struct.pack('I', pos)
+                        key_bytes = struct.pack('>I', pos)
                         value_bytes = txn.get(key_bytes, db=db)
                         if value_bytes:
                             refalt_to_rsid = msgpack.unpackb(value_bytes, raw=False)
