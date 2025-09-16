@@ -109,14 +109,6 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
     norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(filename))
     norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
 
-    # Initialize containers
-    rows = []
-    location = []
-    ref = []
-    alt = []
-    external_ids = []
-    allele_frequencies = []
-
     lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_sorted_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
     db_handles = {}
 
@@ -179,7 +171,7 @@ def extract_variants_for_range(filename, chr, start, end, pval_cutoff=1.0, max_r
 
                     # Lookup RSID using LMDB
                     if db:
-                        key_bytes = struct.pack('I', int(pos))
+                        key_bytes = struct.pack('>I', int(pos))
                         value_bytes = txn.get(key_bytes, db=db)
                         if value_bytes:
                             refalt_to_rsid = msgpack.unpackb(value_bytes, raw=False)
