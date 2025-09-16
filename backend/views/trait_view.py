@@ -117,6 +117,8 @@ class TraitView(generics.GenericAPIView):
             data = extract_variants_for_range(file_name, chr, start, end, pval_cutoff=pval_cutoff)
         elif mode == "chromosome":
             chr = request.GET.get("chr")
+            if chr in (None, ""):
+                return JsonResponse({"error": "Missing required 'chr' parameter for chromosome mode."}, status=400)
             start = int(request.GET.get("start", 0))
             end = int(request.GET.get("end", 0))
             data = extract_variants_for_range(file_name, chr, start, end, pval_cutoff=pval_cutoff)
