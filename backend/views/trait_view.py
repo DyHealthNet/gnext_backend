@@ -1,6 +1,6 @@
 from django.http import JsonResponse
 from backend.utils.extract_data_from_GWAS import extract_variants_for_range, get_all_sign_variants_cutoff
-from backend.utils.extract_data_from_manhatten import get_hits, wrap_generator_to_table_format
+from backend.utils.extract_data_from_manhattan import get_hits, wrap_generator_to_table_format
 from backend.utils.converters import convert_variant_id
 from rest_framework import generics
 import logging
