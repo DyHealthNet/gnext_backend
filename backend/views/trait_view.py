@@ -108,6 +108,8 @@ class TraitView(generics.GenericAPIView):
             # get_all_sign_variants pval 0.05 ~54s(trait 30830)
         elif mode == "rsid":
             varid = request.GET.get("varid")
+            if not varid:
+                return JsonResponse({"error": "Missing required 'varid' parameter for rsid mode."}, status=400)
             neighbor_range = int(request.GET.get("range", 0))
             chr, pos, ref, alt = convert_variant_id(varid)
             start = max(pos - neighbor_range, 0)
