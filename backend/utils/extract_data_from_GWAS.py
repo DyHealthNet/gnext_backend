@@ -197,7 +197,7 @@ def get_all_sign_variants_cutoff(filename, pval_cutoff=5e-8, max_rows=10000):
     norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(filename))
     norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
 
-    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
+    lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_sorted_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
     db_handles = {}
 
     heap = []
@@ -258,8 +258,8 @@ def get_all_sign_variants_cutoff(filename, pval_cutoff=5e-8, max_rows=10000):
 
                     # Lookup RSID using LMDB
                     if db:
-                        key_bytes = struct.pack('I', int(pos))
-                        #key_bytes = struct.pack('>I', pos)
+                        #key_bytes = struct.pack('I', int(pos))
+                        key_bytes = struct.pack('>I', int(pos))
                         value_bytes = txn.get(key_bytes, db=db)
                         if value_bytes:
                             refalt_to_rsid = msgpack.unpackb(value_bytes, raw=False)
