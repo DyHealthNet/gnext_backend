@@ -92,6 +92,9 @@ class TraitView(generics.GenericAPIView):
             pval_cutoff = float(request.GET.get("pval_cutoff", 1.0))
 
         mode = request.GET.get("mode")
+        allowed_modes = {"loci", "pval", "rsid", "chromosome"}
+        if mode not in allowed_modes:
+            return JsonResponse({"error": "Invalid or missing 'mode' parameter. Must be one of: loci, pval, rsid, chromosome."}, status=400)
         if mode == "loci":
             GWAS_manhattan_dir = settings.GWAS_MANHATTAN_DIR
             generator = get_hits(pheno_info, GWAS_manhattan_dir)
