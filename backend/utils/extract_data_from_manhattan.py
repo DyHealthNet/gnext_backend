@@ -5,7 +5,7 @@ import re
 
 logger = logging.getLogger("backend")
 
-def get_hits(pheno, GWAS_manhattan_dir, pval_cutoff = 1e-6):
+def get_hits(pheno, GWAS_manhattan_dir, pval_cutoff=1e-6):
     """
     Collect best variant per peak for a given phenotype.
     """
