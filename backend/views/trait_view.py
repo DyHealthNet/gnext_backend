@@ -1,5 +1,6 @@
 from django.http import JsonResponse
 from backend.utils.extract_data_from_GWAS import extract_variants_for_range, get_all_sign_variants_cutoff
+from backend.utils.extract_data_from_manhattan import get_hits, wrap_generator_to_table_format
 from backend.utils.converters import convert_variant_id
 from rest_framework import generics
 import logging
@@ -77,29 +78,6 @@ class TraitView(generics.GenericAPIView):
         Supports queries by variant ID or chromosome range, with optional p-value cutoff filtering.
         """
         trait = request.GET.get("trait")
-        # Get query parameters
-        pval_cutoff_str = request.GET.get("pval_cutoff")
-        if pval_cutoff_str in (None, "null", ""):
-            pval_cutoff = 1.0
-        else:
-            pval_cutoff = float(request.GET.get("pval_cutoff", 1.0))
-
-        varid = request.GET.get("varid")
-        chr = request.GET.get("chr")
-        start = -1
-        end = -1
-
-        if varid:
-            # rsid mode
-            neighbor_range = int(request.GET.get("range", 0))
-            chr, pos, ref, alt = convert_variant_id(varid)
-            start = max(pos - neighbor_range, 0)
-            end = pos + neighbor_range
-        elif chr:
-            # chromosome range mode
-            start = int(request.GET.get("start",0))
-            end = int(request.GET.get("end",0))
-
 
         logger.info(f"Received trait request with trait: {trait}")
         pheno_info = get_phenotype_from_typesense(trait)
@@ -107,15 +85,43 @@ class TraitView(generics.GenericAPIView):
         if not file_name:
             return JsonResponse({"error": "Trait not found"}, status=404)
 
-        if start >= 0:
-            data = extract_variants_for_range(file_name, chr, start, end, pval_cutoff=pval_cutoff)
+        pval_cutoff_str = request.GET.get("pval_cutoff")
+        if pval_cutoff_str in (None, "null", ""):
+            pval_cutoff = 1.0
         else:
+            pval_cutoff = float(request.GET.get("pval_cutoff", 1.0))
+
+        mode = request.GET.get("mode")
+        allowed_modes = {"loci", "pval", "rsid", "chromosome"}
+        if mode not in allowed_modes:
+            return JsonResponse({"error": "Invalid or missing 'mode' parameter. Must be one of: loci, pval, rsid, chromosome."}, status=400)
+        if mode == "loci":
+            GWAS_manhattan_dir = settings.GWAS_MANHATTAN_DIR
+            generator = get_hits(pheno_info, GWAS_manhattan_dir)
+            data = wrap_generator_to_table_format(generator)
+        elif mode == "pval":
             data = get_all_sign_variants_cutoff(file_name, pval_cutoff=pval_cutoff)
             # get_all_sign_variants_cutoff pval 0.01 ~14s (trait 30830)
             # get_all_sign_variants_cutoff pval 0.05 ~14s (trait 30830)
             # get_all_sign_variants_cutoff pval 1.0 ~30s (trait 30830)
             # get_all_sign_variants pval 0.01 ~44s (trait 30830)
             # get_all_sign_variants pval 0.05 ~54s(trait 30830)
+        elif mode == "rsid":
+            varid = request.GET.get("varid")
+            if not varid:
+                return JsonResponse({"error": "Missing required 'varid' parameter for rsid mode."}, status=400)
+            neighbor_range = int(request.GET.get("range", 0))
+            chr, pos, ref, alt = convert_variant_id(varid)
+            start = max(pos - neighbor_range, 0)
+            end = pos + neighbor_range
+            data = extract_variants_for_range(file_name, chr, start, end, pval_cutoff=pval_cutoff)
+        elif mode == "chromosome":
+            chr = request.GET.get("chr")
+            if chr in (None, ""):
+                return JsonResponse({"error": "Missing required 'chr' parameter for chromosome mode."}, status=400)
+            start = int(request.GET.get("start", 0))
+            end = int(request.GET.get("end", 0))
+            data = extract_variants_for_range(file_name, chr, start, end, pval_cutoff=pval_cutoff)
 
         if data is None:
             return JsonResponse({"error": "No variants found for the given trait."}, status=404)
