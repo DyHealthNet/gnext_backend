@@ -1,72 +1,21 @@
-import time
-
 import pandas as pd
+from pathlib import Path
 import os
-import re
-from decouple import config
 
-from backend.utils.extract_data_from_GWAS import extract_variant_metrics
-from dyhealthnetlight.settings import GWAS_QQ_DIR
+# Path to directory and manifest
+dir_path = Path("/storage03/larend/pgwas_data/new_pgwas_out/GWAS_manhattan")
+manifest = pd.read_csv("/storage03/larend/pgwas_data/pgwas_full_phenotype_file.csv")
+all_phenos = manifest["phenocode"].tolist()
 
-# filepath = "/storage03/larend/pgwas_data/pgwas_full_phenotype_file.csv"
-#
-# df = pd.read_csv(filepath)
-#
-# print(df.head())
-#
-#
-#
-# for i, row in df.iterrows():
-#     # Check if manhattan and QQ file exist
-#     GWAS_DIR = config("GWAS_DIR")
-#     OUTPUT_DIR = config("OUTPUT_DIR", default=GWAS_DIR)
-#     GWAS_MANHATTAN_DIR = os.path.join(OUTPUT_DIR, "GWAS_manhattan")
-#     GWAS_QQ_DIR = os.path.join(OUTPUT_DIR, "GWAS_qq")
-#     norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(row['filename']))
-#     manhattan_filepath = os.path.join(GWAS_MANHATTAN_DIR, norm_filename + "_manhattan.json")
-#     qq_filepath = os.path.join(GWAS_QQ_DIR, norm_filename + "_qq.json")
-#     if not os.path.exists(manhattan_filepath):
-#         print(f"Manhattan file does not exist: {manhattan_filepath}")
-#     if not os.path.exists(qq_filepath):
-#         print(f"QQ file does not exist: {qq_filepath}")
-#
-#
+# Extract existing phenocodes from filenames
+existing = [p.name.split(".gwaslab_manhattan")[0] for p in dir_path.glob("*.gwaslab_manhattan.json")]
 
-# from django.conf import settings
-# import typesense
-#
-# TYPESENSE_CONFIG = {
-#     "nodes": [{
-#         "host": config("VITE_TYPESENSE_HOST"),
-#         "port": config("VITE_TYPESENSE_PORT"),
-#         "protocol": "http"
-#     }],
-#     "api_key": config("VITE_TYPESENSE_KEY"),
-#     "connection_timeout_seconds": 10
-# }
-#
-# client = typesense.Client(TYPESENSE_CONFIG)
-#
-# # Retrieve schema of the collection
-# schema = client.collections['autocomplete'].retrieve()
-#
-# # Get only the field names
-# field_names = [field['name'] for field in schema['fields']]
-#
-# print(field_names)
-#
-# page = 1
-# per_page = 100
-# results = client.collections['autocomplete'].documents.search({
-#     "q": "*",
-#     "query_by": "id",  # Replace with any searchable field
-#     "filter_by": "type:trait",
-#     "per_page": per_page,
-#     "page": page})
-# hits = results.get("hits", [])
-# print(hits)
+# Compare
+missing = sorted(set(all_phenos) - set(existing))
 
-#start = time.time()
-#extract_variant_metrics(22, 16920281, "A", "T")
-#end = time.time()
-#print("It took ", end - start, " to retrieve all metrics for a single file!")
+for m in missing:
+    print(m)
+print(f"Missing ({len(missing)}):")
+
+missing = sorted(set(existing) - set(all_phenos))
+print(f"Missing ({len(missing)}):")

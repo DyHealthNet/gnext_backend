@@ -18,7 +18,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
        try:
            logger.info("Starting normalization of GWAS summary statistics files.")
-           #self.normalize_GWAS_stats_files()
+           self.normalize_GWAS_stats_files()
            logger.info("Finished normalization of GWAS summary statistics files!")
        except Exception as e:
            # print stack trace

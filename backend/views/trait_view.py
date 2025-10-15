@@ -147,7 +147,7 @@ class ChromosomeBoundsView(generics.GenericAPIView):
         norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(file_name))
         norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
         lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_sorted_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
-
+        logger.info("LMDB Path: " + lmdb_path)
         try:
             lmdb_env = lmdb.open(
                 lmdb_path,

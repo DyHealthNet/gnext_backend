@@ -22,7 +22,7 @@ class Command(BaseCommand):
        try:
            logger.info("Starting setup of VEP%s." % (", Typesense and MAGMA" if settings.MAGMA_ENABLED else " and Typesense"))
            # Setup VEP -> check if docker pulled and cache installed
-           self.setup_VEP()
+           #self.setup_VEP()
            # Setup Typesense -> check if typesense running and if schema exists
            self.setup_typesense()
            # Setup MAGMA -> check if executable downloaded if Magma is enabled
@@ -58,17 +58,19 @@ class Command(BaseCommand):
 
 
         # Check if Autocomplete schema exists -> if not create it
-        client = typesense.Client(config.TYPESENSE_CONFIG)
+        client = typesense.Client(settings.TYPESENSE_CONFIG)
 
         schema_autocomplete = {
             "name": "autocomplete",
             "fields": [
-                {"name": "type", "type": "string", "facet": True},
                 {"name": "id", "type": "string"},
+                {"name": "type", "type": "string", "facet": True},
+                {"name": "label", "type": "string"},
                 {"name": "description", "type": "string"},
                 {"name": "external_ref", "type": "string"},
                 {"name": "category", "type": "string"},
                 {"name": "filename", "type": "string"},
+                {"name": "nr_samples", "type": "int32"}
             ]
         }
 

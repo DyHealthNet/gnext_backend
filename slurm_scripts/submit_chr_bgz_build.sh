@@ -10,7 +10,7 @@
 #SBATCH --partition=slow-mc2
 
 # Configure paths
-OUT_DIR=/storage03/larend/pgwas_data/pgwas_out/GWAS_chr_bgz
+OUT_DIR=/storage03/larend/pgwas_data/new_pgwas_out/GWAS_chr_bgz
 mkdir -p "${OUT_DIR}"
 CHR=$SLURM_ARRAY_TASK_ID
 

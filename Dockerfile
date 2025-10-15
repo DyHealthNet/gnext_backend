@@ -16,6 +16,7 @@ COPY requirements.txt .
 RUN python -m pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir gunicorn
+RUN pip install setuptools
 
 
 # App source

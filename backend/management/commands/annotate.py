@@ -19,7 +19,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def annotate_variants():
-        genome_build = config("GENOME_BUILD")
+        genome_build = config("VITE_GENOME_BUILD")
 
         GWAS_norm_dir = settings.GWAS_NORM_DIR
         GWAS_vep_dir = settings.GWAS_VEP_DIR

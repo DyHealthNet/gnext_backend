@@ -79,13 +79,18 @@ def extract_variant_metrics(chr, pos, ref, alt):
     max_af = float(np.max(af_arr[mask])) if mask.any() else float("-inf")
 
     for idx, trait_code in enumerate(trait_names):
+        if metric_data["neg_log_pvalue"][idx] in (".", "NA", "", None):
+            logger.info(f"Skipping trait {trait_code} with missing neg_log_pvalue at index {idx}")
+            continue
+
         cat, desc = pheno_map.get(trait_code, ("", trait_code))
         results.append({
             "id": trait_code,
             "x": idx,
             "trait_group": cat,
             "trait_label": desc,
-            "log_pvalue": _to_float(metric_data["neg_log_pvalue"][idx]),
+            "neg_log_pvalue": _to_float(metric_data["neg_log_pvalue"][idx]), # for table
+            "log_pvalue": _to_float(metric_data["neg_log_pvalue"][idx]), # for plot
             "pvalue": np.power(10, -_to_float(metric_data["neg_log_pvalue"][idx])),
             "beta": _to_float(metric_data["beta"][idx]),
             "stderr_beta": _to_float(metric_data["stderr_beta"][idx]),

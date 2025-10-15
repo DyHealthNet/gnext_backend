@@ -46,12 +46,14 @@ class Command(BaseCommand):
                 schema_autocomplete = {
                     "name": "autocomplete",
                     "fields": [
-                        {"name": "type", "type": "string", "facet": True},
                         {"name": "id", "type": "string"},
+                        {"name": "type", "type": "string", "facet": True},
+                        {"name": "label", "type": "string"},
                         {"name": "description", "type": "string"},
                         {"name": "external_ref", "type": "string"},
                         {"name": "category", "type": "string"},
                         {"name": "filename", "type": "string"},
+                        {"name": "nr_samples", "type": "int32"}
                     ]
                 }
                 client.collections.create(schema_autocomplete)
@@ -66,7 +68,7 @@ class Command(BaseCommand):
         """
         Fill Typesense with the provided parameters.
         """
-        client = typesense.Client(config.TYPESENSE_CONFIG)
+        client = typesense.Client(settings.TYPESENSE_CONFIG)
 
         # Remove all entries from the collection
         Command.reset_collection_if_needed(client, "autocomplete")
@@ -86,10 +88,12 @@ class Command(BaseCommand):
             doc = {
                 'type': 'trait',
                 'id': str(r['phenocode']),
+                'label': str(r['phenocode']),
                 'description': r['description'],
                 'external_ref': r['external_id'],
                 'category': r['category'],
                 'filename': r['filename'],
+                'nr_samples': int(r['nr_samples'])
             }
             client.collections["autocomplete"].documents.upsert(doc)
 
@@ -114,11 +118,14 @@ class Command(BaseCommand):
                     "type": "variant",
                     "id": variant_dict["CHROM"] + "_" + variant_dict["POS"] + "_" + variant_dict["REF"] + "/" +
                           variant_dict["ALT"],
+                    "label": variant_dict["CHROM"] + "_" + variant_dict["POS"] + "_" + variant_dict["REF"] + "/" +
+                          variant_dict["ALT"],
                     "description": variant_dict["CHROM"] + "_" + variant_dict["POS"] + "_" + variant_dict["REF"] + "/" +
                                    variant_dict["ALT"],
                     "external_ref": rs_ids,
                     "category": "",
                     "filename": "",
+                    "nr_samples": 0,
                 }
                 documents.append(doc)
                 if len(documents) % batch_size == 0:

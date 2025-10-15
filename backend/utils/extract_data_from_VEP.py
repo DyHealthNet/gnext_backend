@@ -59,7 +59,6 @@ def extract_variant_annotation(variant_id):
         rows = []
         consequences = []
         location = chr + ":" + str(pos)
-        AF = 0
         closest_gene = []
         transcript_dict = {}
         regulatory_dict = {}
@@ -136,15 +135,16 @@ def extract_variant_annotation(variant_id):
                                "rows": motif_consequences_dt.to_dict(orient="records")}
 
             # Get closest genes
-            info_pd["DISTANCE"] = info_pd["DISTANCE"].replace('', pd.NA)
-            float_distances = info_pd.dropna(subset = ["DISTANCE"])
-            float_distances["DISTANCE"] = float_distances["DISTANCE"].astype("float")
-            #float_distances_protein_coding = float_distances.loc[float_distances["BIOTYPE"] == "protein_coding"]
-            if not float_distances.empty:
-                closest_gene = [float_distances.loc[float_distances["DISTANCE"].astype("float").idxmin(), "SYMBOL"]]
-            else:
-                # take all genes (because no distance given)
-                closest_gene = info_pd["SYMBOL"].drop_duplicates().tolist()
+            genes_pd = info_pd.dropna(subset = ["SYMBOL"])
+            if genes_pd.empty:
+                continue
+            # Rank by impact (high, moderate, low, modifier) and then by consequence using VEP_RANK_DICT
+            genes_pd["IMPACT_rank"] = genes_pd["IMPACT"].map({"HIGH": 1, "MODERATE": 2, "LOW": 3, "MODIFIER": 4})
+            genes_pd["Consequence_rank"] = genes_pd["Consequence"].apply(
+                lambda x: min([VEP_RANK_DICT.get(term, {"rank": float('inf')})["rank"] for term in x.split("&")]) if isinstance(x, str) else float('inf')
+            )
+            genes_pd = genes_pd.sort_values(by=["IMPACT_rank", "Consequence_rank", "DISTANCE"], ascending=[True, True, True])
+            closest_gene = genes_pd["SYMBOL"].drop_duplicates().to_list()
             rows+= info_dict # TODO: check if this even happens that you get two rows of a VCF file for a single position
 
         msc, msc_impact = get_most_severe(consequences)
@@ -156,7 +156,6 @@ def extract_variant_annotation(variant_id):
         "alt": alt,
         "external_ids": external_ids,
         "allele_frequencies": allele_frequencies,
-        #"AF": AF,
         "msc": msc,
         "msc_impact": msc_impact,
         "transcript_consequences": transcript_dict if len(transcript_consequences_dt) > 0 else None,

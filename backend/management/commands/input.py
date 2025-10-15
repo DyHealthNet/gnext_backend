@@ -29,8 +29,8 @@ class Command(BaseCommand):
        try:
            logger.info("Starting generation of Manhattan, QQ%s." % (" and MAGMA input files" if settings.MAGMA_ENABLED else " files"))
            self.generate_manhattan_qq_magma_files()
-           if settings.MAGMA_ENABLED:
-                  self.prepare_MAGMA_mapping_input()
+           #if settings.MAGMA_ENABLED:
+           #       self.prepare_MAGMA_mapping_input()
            self.generate_top_hits()
            logger.info("Finished generation of Manhattan, QQ%s!" % (" and MAGMA input files" if settings.MAGMA_ENABLED else " files"))
        except Exception as e:
@@ -331,18 +331,35 @@ class Command(BaseCommand):
             for pheno in phenos:
                 hits.extend(get_hits(pheno, GWAS_manhattan_dir, pval_cutoff))
 
+
+
             # Sort by p-value ascending, keep top N
             hits.sort(key=lambda h: h["neg_log_pvalue"], reverse=True)
             hits = hits[:max_limit]
+
 
             # Keep only a subset of useful columns
             # cleaned_hits = [
             #     {k: hit.get(k) for k in ["category", "description", "pos", "pvalue", "phenocode", "top_variant", "category"]}
             #     for hit in hits
             # ]
+            def replace_inf(obj):
+                if isinstance(obj, dict):
+                    return {k: replace_inf(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [replace_inf(x) for x in obj]
+                elif isinstance(obj, float):
+                    if obj == math.inf:
+                        return "Infinity"
+                    if obj == -math.inf:
+                        return "-Infinity"
+                    if math.isnan(obj):
+                        return "NaN"
+                return obj
+
 
             with open(outpath, "w") as f:
-                json.dump(hits, f, indent=2)
+                json.dump(replace_inf(hits), f, indent=2)
 
             return hits
 
@@ -372,15 +389,16 @@ def get_hits(pheno, GWAS_manhattan_dir, pval_cutoff):
                 ref = v.get("ref", "")
                 alt = v.get("alt", "")
                 rsid = v.get("rsid")
+                v["neg_log_pvalue"] = float(v.get("neg_log_pvalue"))
                 if rsid and rsid != ".":
                     v["top_variant"] = f"{chrom}_{pos}_{ref}/{alt} ({rsid})"
                 else:
                     v["top_variant"] = f"{chrom}_{pos}_{ref}/{alt}"
                 alt_allele_freq = v.get("alt_allele_freq")
                 v["MAF"] = min(float(alt_allele_freq), 1 - float(alt_allele_freq)) if alt_allele_freq else None
-                for k in ["description", "category"]:
-                    if k in pheno:
-                        v[k] = pheno[k]
+                v["trait_group"] = pheno["category"]
+                v["trait_label"] = pheno["description"]
+                v["trait_id"] = pheno["phenocode"]
                 peak_to_best[key] = v
 
     yield from peak_to_best.values()

@@ -146,7 +146,7 @@ TYPESENSE_CONFIG = {
         "protocol": "http"
     }],
     "api_key": config("VITE_TYPESENSE_KEY"),
-    "connection_timeout_seconds": 10
+    "connection_timeout_seconds": 200
 }
 
 # Configuration parameters
