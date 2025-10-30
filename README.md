@@ -17,89 +17,28 @@ conda activate dyhealthnetlight_backend
 ```
 
 
-# Setup 
+# Preprocessing Pipeline
 
-You can run the setup by executing the management command `setup`:
-```python
-python manage.py setup
-```
+Before running the platform, you need to preprocess your GWAS summary statistics file using our Nextflow pipeline, available here: https://github.com/DyHealthNet/dyhealthnetlight_nf_pipeline
 
-This will check if VEP, Typesense and MAGMA are ready for being used. If not, it will make sure that the necessary directories are created and the required files are downloaded.
 
-# Preprocessing Steps
+# Setup
 
-The preprocessing steps are necessary to prepare the data for the DyHealthNetLight backend.
+## Configuration
 
-## Normalize GWAS Summary Statistics
-
-You can run this step by executing the management command `normalize`:
-```python
-python manage.py normalize
-```
-
-This creates the GWAS_stats_norm directory, which contains the normalized GWAS summary statistics.
-
-## Generate Input Data: Manhattan, QQ, MAGMA files
-
-You can run this step by executing the management command `input`:
-```python
-python manage.py input
-```
-
-This creates the GWAS_manhattan and GWAS_qq directories, which contain the generated Manhattan and QQ JSON files.
-
-## VEP Annotation
-
-To generate a VCF file containing all variants and annotate the variants using VEP, we plan to have the management command `annotate`. 
-
-Once we implement our docker compose stack, this command will be changed.
-
-You can run this step by executing the management command `annotate`:
+You need to fill the .env file with your study-specific parameters. For checking whether everything in the .env file is correct, you can run the check_env management command.
 
 ```python
-python manage.py annotate
+python manage.py check_env
 ```
 
 ## Typesense
 
-You can run the typesense management command to fill the Typesense database with the necessary data:
+Before being able to deploy the platform, you can run the typesense management command to download the Typesense docker image, run the container, and fill the Typesense database with the necessary data:
 
 ```python
 python manage.py typesense
 ```
-
-## MAGMA Execution
-
-### Download MAGMA
-
-Magma gets downloaded automatically. If, however, the download fails or is outdated, it is also possible to download it yourself and specify the path to the executable in the .env.
-
-You can download the MAGMA software from the official website: https://ctg.cncr.nl/software/MAGMA
-
-Make a directory called magma, download the zip and unzip it:
-
-```bash
-mkdir magma
-cd magma
-wget -O magma.zip https://vu.data.surfsara.nl/index.php/s/zkKbNeNOZAhFXZB/download
-unzip magma.zip
-```
-
-Specify the location of the MAGMA executable in the .env file!
-
-### Download Reference Data
-
-You can download the reference data from the official website: https://ctg.cncr.nl/software/MAGMA#reference_data
-
-Make a directory called magma_reference_data, download the zip and unzip it:
-
-```bash
-mkdir g1000_eur
-cd g1000_eur
-unzip g1000_eur.zip 
-```
-
-Specify the location of the LD reference data in the .env file!
 
 
 # Run Django backend

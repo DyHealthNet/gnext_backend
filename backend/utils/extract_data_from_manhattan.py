@@ -3,14 +3,16 @@ import json
 import logging
 import re
 
+from django.conf import settings
+
+
 logger = logging.getLogger("backend")
 
-def get_hits(pheno, GWAS_manhattan_dir, pval_cutoff=1e-6):
+def get_hits(pheno, pval_cutoff=1e-6):
     """
     Collect best variant per peak for a given phenotype.
     """
-    norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(pheno["filename"]))
-    manhattan_filepath = os.path.join(GWAS_manhattan_dir, norm_filename + "_manhattan.json")
+    manhattan_filepath = os.path.join(settings.MANHATTAN_DIR, pheno["id"] + "_manhattan.json")
 
     with open(manhattan_filepath) as f:
         variants = json.load(f)["unbinned_variants"]
@@ -34,9 +36,9 @@ def get_hits(pheno, GWAS_manhattan_dir, pval_cutoff=1e-6):
                 alt = v.get("alt", "")
                 rsid = v.get("rsid")
                 if rsid and rsid != ".":
-                    v["top_variant"] = f"{chrom}_{pos}_{ref}/{alt} ({rsid})"
+                    v["variant_id"] = f"{chrom}_{pos}_{ref}/{alt} ({rsid})"
                 else:
-                    v["top_variant"] = f"{chrom}_{pos}_{ref}/{alt}"
+                    v["variant_id"] = f"{chrom}_{pos}_{ref}/{alt}"
                 alt_allele_freq = v.get("alt_allele_freq")
                 v["MAF"] = min(float(alt_allele_freq), 1 - float(alt_allele_freq)) if alt_allele_freq else None
                 for k in ["description", "category"]:
@@ -54,12 +56,16 @@ def wrap_generator_to_table_format(generator):
 
     # Define the columns you want in the table (and in order)
     desired_headers = [
-        "top_variant",
-        "neg_log_pvalue",
+        "variant_id",
+        "chrom",
+        "pos",
+        "ref",
+        "alt",
         "beta",
         "stderr_beta",
         "alt_allele_freq",
         "pvalue",
+        "neg_log_pvalue",
         "peak",
     ]
 

@@ -32,17 +32,14 @@ def get_most_severe(consequences):
                 most_severe_impact = VEP_RANK_DICT[t]["impact"]
     return most_severe, most_severe_impact
 
-
 def extract_variant_annotation(variant_id):
-    vep_anno_file = os.path.join(settings.GWAS_VEP_DIR, settings.GWAS_ANNO_VCF_FILE)
 
     # Extract GWAS results of variant from phenotype file via tabix
-    tabix_file = pysam.TabixFile(vep_anno_file)
+    tabix_file = pysam.TabixFile(settings.ANNO_VCF_FILE)
     # Get variant information
-    logger.info("INFO: Extracting variant annotation for variant ID: " + variant_id)
     chr, pos, ref, alt = convert_variant_id(variant_id)
 
-    with gzip.open(vep_anno_file, 'rt') as vcf:
+    with gzip.open(settings.ANNO_VCF_FILE, 'rt') as vcf:
         for line in vcf:
             if line.startswith("##INFO"):
                 anno_columns = line.strip().split("|")
@@ -52,7 +49,6 @@ def extract_variant_annotation(variant_id):
                 header = line.strip().split("\t")
                 columns = [h.replace("#", "") for h in header]
                 break
-
     try:
         allele_frequencies = {}
         external_ids = []
@@ -69,10 +65,10 @@ def extract_variant_annotation(variant_id):
             info = row["INFO"].replace("CSQ=", "").split(",")
             info_dict = [dict(zip(anno_columns, i.split("|"))) for i in info]
             info_pd = pd.DataFrame(info_dict)
+            logger.info("Info DataFrame Columns:\n%s", info_pd.columns)
+            logger.info("Info DataFrame Sizes:\n%s", info_pd.shape)
 
             # Allele frequencies
-            af_keys = [key for key in anno_columns if key.endswith("_AF") and key != "MAX_AF"]
-            allele_frequencies = info_pd[["AF"] + af_keys].replace('', pd.NA).dropna(axis=1, how='all').astype('float').to_dict(orient='records')[0]
             # rename keys to be more readable
             new_af_names = {"AF": "Global AF (1000 Genomes)",
                             "AFR_AF": "AFR (1000 Genomes)",
@@ -80,6 +76,7 @@ def extract_variant_annotation(variant_id):
                             "EAS_AF": "EAS (1000 Genomes)",
                             "EUR_AF": "EUR (1000 Genomes)",
                             "SAS_AF": "SAS (1000 Genomes)",
+                            "ASN_AF": "ASN (1000 Genomes)",
                             "gnomADe_AF": "Global AF (gnomAD Exome)",
                             "gnomADe_AFR_AF": "AFR (gnomAD Exome)",
                             "gnomADe_AMR_AF": "AMR (gnomAD Exome)",
@@ -101,9 +98,18 @@ def extract_variant_annotation(variant_id):
                             "gnomADg_MID_AF": "MID (gnomAD Genome)",
                             "gnomADg_AMI_AF": "AMI (gnomAD Genome)",
                             "gnomADg_REMAINING_AF": "Remaining (gnomAD Genome)",
+                            "gnomADe_REMAINED_AF": "Remaining (gnomAD Exome)"
                             }
 
-            allele_frequencies = {new_af_names.get(k, k): v for k, v in allele_frequencies.items()}
+            af_keys = [key for key in anno_columns if key.endswith("_AF") and key not in  ["MAX_AF", "MAX_AF_POPS"]]
+            af_cols = ["AF"] + af_keys
+            af_df = info_pd[af_cols].replace('', pd.NA).dropna(axis=1, how='all')
+            if not af_df.empty and not af_df.dropna(how='all').empty:
+                allele_frequencies = af_df.astype('float', errors='ignore') \
+                    .to_dict(orient='records')[0]
+                allele_frequencies = {new_af_names.get(k, k): v for k, v in allele_frequencies.items()}
+            else:
+                allele_frequencies = {}
 
 
             external_ids = info_pd["Existing_variation"].str.split("&").explode().drop_duplicates().tolist()

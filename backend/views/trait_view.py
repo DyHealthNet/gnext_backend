@@ -14,7 +14,8 @@ import pysam
 import struct
 import lmdb
 import contextlib
-
+import pandas as pd
+import numpy as np
 
 from backend.utils.typesense_client import get_phenotype_from_typesense
 
@@ -27,10 +28,9 @@ class ManhattanView(generics.GenericAPIView):
         """
         trait_id = request.GET.get("id")
         pheno_info = get_phenotype_from_typesense(trait_id)
-        file_name = pheno_info['filename'] if pheno_info else None
-        if file_name is not None:
-            norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(file_name))
-            manhattan_filepath = os.path.join(settings.GWAS_MANHATTAN_DIR, norm_filename + "_manhattan.json")
+        phenocode = pheno_info['id'] if pheno_info else None
+        if phenocode is not None:
+            manhattan_filepath = os.path.join(settings.MANHATTAN_DIR, phenocode + "_manhattan.json")
             with open(manhattan_filepath, "r") as f:
                 manhattan_data = json.load(f)
             return JsonResponse(manhattan_data)
@@ -45,17 +45,16 @@ class QQView(generics.GenericAPIView):
         """
         trait_id = request.GET.get("id")
         pheno_info = get_phenotype_from_typesense(trait_id)
-        file_name = pheno_info['filename'] if pheno_info else None
-        if file_name is not None:
-            norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(file_name))
-            qq_filepath = os.path.join(settings.GWAS_QQ_DIR, norm_filename + "_qq.json")
+        logger.info(pheno_info)
+        phenocode = pheno_info['id'] if pheno_info else None
+        if phenocode is not None:
+            qq_filepath = os.path.join(settings.QQ_DIR, phenocode + "_qq.json")
             with open(qq_filepath, "r") as f:
                 qq_data = json.load(f)
             return JsonResponse(qq_data)
         else:
             logger.error(f"No phenotype found for trait: {trait_id}")
             return JsonResponse({"error": "Trait not found"}, status=404)
-
 
 class TraitInfoView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
@@ -77,12 +76,12 @@ class TraitView(generics.GenericAPIView):
         Handles GET requests to retrieve variant data for a given trait, chromosome, and position range.
         Supports queries by variant ID or chromosome range, with optional p-value cutoff filtering.
         """
-        trait = request.GET.get("trait")
+        trait = request.GET.get("id")
 
         logger.info(f"Received trait request with trait: {trait}")
         pheno_info = get_phenotype_from_typesense(trait)
-        file_name = pheno_info['filename'] if pheno_info else None
-        if not file_name:
+        phenocode = pheno_info['id'] if pheno_info else None
+        if not phenocode:
             return JsonResponse({"error": "Trait not found"}, status=404)
 
         pval_cutoff_str = request.GET.get("pval_cutoff")
@@ -96,16 +95,10 @@ class TraitView(generics.GenericAPIView):
         if mode not in allowed_modes:
             return JsonResponse({"error": "Invalid or missing 'mode' parameter. Must be one of: loci, pval, rsid, chromosome."}, status=400)
         if mode == "loci":
-            GWAS_manhattan_dir = settings.GWAS_MANHATTAN_DIR
-            generator = get_hits(pheno_info, GWAS_manhattan_dir)
+            generator = get_hits(pheno_info)
             data = wrap_generator_to_table_format(generator)
         elif mode == "pval":
-            data = get_all_sign_variants_cutoff(file_name, pval_cutoff=pval_cutoff)
-            # get_all_sign_variants_cutoff pval 0.01 ~14s (trait 30830)
-            # get_all_sign_variants_cutoff pval 0.05 ~14s (trait 30830)
-            # get_all_sign_variants_cutoff pval 1.0 ~30s (trait 30830)
-            # get_all_sign_variants pval 0.01 ~44s (trait 30830)
-            # get_all_sign_variants pval 0.05 ~54s(trait 30830)
+            data = get_all_sign_variants_cutoff(phenocode, pval_cutoff=pval_cutoff)
         elif mode == "rsid":
             varid = request.GET.get("varid")
             if not varid:
@@ -114,14 +107,14 @@ class TraitView(generics.GenericAPIView):
             chr, pos, ref, alt = convert_variant_id(varid)
             start = max(pos - neighbor_range, 0)
             end = pos + neighbor_range
-            data = extract_variants_for_range(file_name, chr, start, end, pval_cutoff=pval_cutoff)
+            data = extract_variants_for_range(phenocode, chr, start, end, pval_cutoff=pval_cutoff)
         elif mode == "chromosome":
             chr = request.GET.get("chr")
             if chr in (None, ""):
                 return JsonResponse({"error": "Missing required 'chr' parameter for chromosome mode."}, status=400)
             start = int(request.GET.get("start", 0))
             end = int(request.GET.get("end", 0))
-            data = extract_variants_for_range(file_name, chr, start, end, pval_cutoff=pval_cutoff)
+            data = extract_variants_for_range(phenocode, chr, start, end, pval_cutoff=pval_cutoff)
 
         if data is None:
             return JsonResponse({"error": "No variants found for the given trait."}, status=404)
@@ -137,17 +130,14 @@ class ChromosomeBoundsView(generics.GenericAPIView):
         to their position bounds (min and max).
         """
         start_time = time.time()
-        trait = request.GET.get("trait")
+        trait = request.GET.get("id")
         logger.info(f"Received chromosome request with trait: {trait}")
         pheno_info = get_phenotype_from_typesense(trait)
-        file_name = pheno_info['filename'] if pheno_info else None
-        if not file_name:
+        phenocode = pheno_info['id'] if pheno_info else None
+        if not phenocode:
             return JsonResponse({"error": "Trait not found"}, status=404)
 
-        norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(file_name))
-        norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
-        lmdb_path = os.path.join(settings.GWAS_NORM_DIR, f"lmdb_sorted_{config('VITE_GENOME_BUILD')}") + "/data.mdb"
-        logger.info("LMDB Path: " + lmdb_path)
+        lmdb_path = settings.LMDB_FILE
         try:
             lmdb_env = lmdb.open(
                 lmdb_path,
@@ -192,26 +182,31 @@ class ChromosomeBoundsView(generics.GenericAPIView):
         end_time = time.time()
         elapsed_time = end_time - start_time
         logger.debug(f"FINISHED FILTERING in {elapsed_time:.2f} seconds for getting the chromosome bounds")
-
         return JsonResponse(bounds, safe=False)
 
-    # def get(self, request, *args, **kwargs):
-    #     """
-    #     Handles GET requests to retrieve the minimum and maximum position bounds for each chromosome
-    #     in the GWAS file associated with a given trait. Returns a dictionary mapping chromosome names
-    #     to their position bounds (min and max).
-    #     """
-    #     start_time = time.time()
-    #     trait = request.GET.get("trait")
-    #     logger.info(f"Received request with trait: {trait}")
-    #     pheno_info = get_phenotype_from_typesense(trait)
-    #     file_name = pheno_info['filename'] if pheno_info else None
-    #     if not file_name:
-    #         return JsonResponse({"error": "Trait not found"}, status=404)
-    #
-    #     norm_filename = re.sub(r'(\.[^.]+){1,2}$', '', os.path.basename(file_name))
-    #     norm_filepath = os.path.join(settings.GWAS_NORM_DIR, norm_filename + ".gz")
-    #
-    #     try:
-    #         tabix_file = pysam.TabixFile(norm_filepath)
-    #     except Exception as e:
+class MAGMAView(generics.GenericAPIView):
+    def get(self, request, *args, **kwargs):
+        """
+        Handles GET requests to the MAGMA API.
+        """
+        trait_id = request.GET.get("id")
+        if trait_id is not None:
+            magma_filepath = os.path.join(settings.MAGMA_RESULTS_DIR, trait_id + "_magma.genes.out")
+            magma_data = pd.read_csv(magma_filepath, delim_whitespace=True)
+            # rename columns
+            magma_data = magma_data.rename(columns={"GENE": "Gene", "CHR": "Chrom", "START": "Start", "STOP": "End", "NSNPS": "#SNPs", "P": "Pvalue", "ZSTAT": "Zvalue"})
+            # drop N and NPARAM column
+            magma_data = magma_data.drop(columns=["N", "NPARAM"])
+            # add -log10 pvalue column
+            magma_data["-Log10(Pvalue)"] = -1 * np.log10(magma_data["Pvalue"])
+            magma_data["Bonferroni Pvalue"] = magma_data["Pvalue"] * len(magma_data)
+            magma_data = magma_data.sort_values(by="Pvalue")
+            final_dict = {
+                "rows": magma_data.to_dict(orient='records'),
+                "header": list(magma_data.columns),
+                "num_rows": len(magma_data)
+            }
+            return JsonResponse(final_dict)
+        else:
+            logger.error(f"No phenotype found for trait: {trait_id}")
+            return JsonResponse({"error": "Trait not found"}, status=404)

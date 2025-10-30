@@ -52,6 +52,7 @@ def get_all_phenotypes_from_typesense():
 
 def get_number_of_documents():
     client = get_client()
+    logger.info(client)
     results = client.collections['autocomplete'].documents.search({
         "q": "*",
         "query_by": "description",

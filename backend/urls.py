@@ -1,6 +1,6 @@
 from .views.variant_view import VariantMetricsView, VariantAnnotationView
-from .views.overview_view import OverviewDataView, TopHitsView
-from .views.trait_view import ManhattanView, QQView, TraitView, ChromosomeBoundsView, TraitInfoView
+from .views.overview_view import OverviewDataView, TopHitsView, MAGMAConfigView
+from .views.trait_view import ManhattanView, QQView, TraitView, ChromosomeBoundsView, TraitInfoView, MAGMAView
 from django.urls import path
 
 
@@ -14,5 +14,7 @@ urlpatterns = [
     path("trait_get_info/", TraitInfoView.as_view(), name = "trait_get_info"),
     path("trait_get_variants/", TraitView.as_view(), name="trait_get_variants"),
     path("trait_get_chromosomeBounds/", ChromosomeBoundsView.as_view(), name="trait_get_chromosomeBounds"),
+    path("trait_get_magma_results/", MAGMAView.as_view(), name="trait_get_magma_results"),
+    path("overview_get_magma_config/", MAGMAConfigView.as_view(), name="overview_get_magma_config"),
 ]
 

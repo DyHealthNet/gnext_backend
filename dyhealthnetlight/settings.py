@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 from pathlib import Path
 from decouple import config
-from backend.utils.preprocessing.magma.magma import get_bool
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -150,19 +149,19 @@ TYPESENSE_CONFIG = {
 }
 
 # Configuration parameters
-GWAS_DIR = config("GWAS_DIR")
-OUTPUT_DIR = config("OUTPUT_DIR", default=GWAS_DIR)
-GWAS_NORM_DIR = os.path.join(OUTPUT_DIR, "GWAS_stats_norm")
-GWAS_MANHATTAN_DIR = os.path.join(OUTPUT_DIR, "GWAS_manhattan")
-GWAS_QQ_DIR = os.path.join(OUTPUT_DIR, "GWAS_qq")
-GWAS_VEP_DIR = os.path.join(OUTPUT_DIR, "GWAS_vep")
-GWAS_VCF_FILE = "full_variants.vcf"
-GWAS_ANNO_VCF_FILE = "annotated_full_variants.vcf.bgz"
-MAGMA_ENABLED = get_bool(config("MAGMA_ENABLED"))
-GWAS_MAGMA_DIR = os.path.join(OUTPUT_DIR, "GWAS_magma")
-GWAS_ANNO_MAGMA_FILE = "magma.genes.annot"
-GWAS_ZARR_VARIANTS_TRAITS = os.path.join(OUTPUT_DIR, "GWAS_zarr", "pvalues.zarr")
-GWAS_CHR_BGZ_DIR = os.path.join(OUTPUT_DIR, "GWAS_chr_bgz")
+NF_DATA_DIR = config("NF_DATA_DIR")
+NORM_DIR = os.path.join(NF_DATA_DIR, "normalize")
+MANHATTAN_DIR = os.path.join(NF_DATA_DIR, "manhattan_qq")
+QQ_DIR = os.path.join(NF_DATA_DIR, "manhattan_qq")
+VEP_DIR = os.path.join(NF_DATA_DIR, "annotate")
+VCF_FILE = os.path.join(VEP_DIR, "full_variants.vcf.gz")
+ANNO_VCF_FILE = os.path.join(VEP_DIR, "out/annotated_full_variants.vcf.gz")
+MAGMA_RESULTS_DIR = os.path.join(NF_DATA_DIR, "magma_results")
+CHR_BGZ_DIR = os.path.join(NF_DATA_DIR, "chr_bgz")
+LMDB_FILE = os.path.join(NF_DATA_DIR, "lmdb/lmdb-data.mdb")
+TOP_HITS_FILE = os.path.join(NF_DATA_DIR, "top_hits/top_hits.json")
+NF_PARAM_FILE = os.path.join(NF_DATA_DIR, "meta/workflow_params.json")
+
 
 LOGGING = {
     'version': 1,
