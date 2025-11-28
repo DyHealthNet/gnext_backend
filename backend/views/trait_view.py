@@ -137,7 +137,7 @@ class ChromosomeBoundsView(generics.GenericAPIView):
         if not phenocode:
             return JsonResponse({"error": "Trait not found"}, status=404)
 
-        lmdb_path = settings.LMDB_FILE
+        lmdb_path = settings.LMDB_RSID_FILE
         try:
             lmdb_env = lmdb.open(
                 lmdb_path,
@@ -194,7 +194,7 @@ class MAGMAView(generics.GenericAPIView):
             magma_filepath = os.path.join(settings.MAGMA_RESULTS_DIR, trait_id + "_magma.genes.out")
             magma_data = pd.read_csv(magma_filepath, delim_whitespace=True)
             # rename columns
-            magma_data = magma_data.rename(columns={"GENE": "Gene", "CHR": "Chrom", "START": "Start", "STOP": "End", "NSNPS": "#SNPs", "P": "Pvalue", "ZSTAT": "Zvalue"})
+            magma_data = magma_data.rename(columns={"GENE": "Gene", "CHR": "Chrom", "START": "Start", "STOP": "End", "NSNPS": "#SNPs", "P": "Pvalue", "ZSTAT": "Zvalue", "SYMBOL":"Symbol"})
             # drop N and NPARAM column
             magma_data = magma_data.drop(columns=["N", "NPARAM"])
             # add -log10 pvalue column

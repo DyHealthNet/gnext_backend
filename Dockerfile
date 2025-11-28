@@ -33,8 +33,8 @@ RUN chmod 0755 /app/docker-entrypoint.sh
 
 
 EXPOSE 8000
-ENV DJANGO_SETTINGS_MODULE=dyhealthnetlight.settings
+ENV DJANGO_SETTINGS_MODULE=gnext.settings
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
-CMD ["gunicorn", "dyhealthnetlight.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+CMD ["gunicorn", "gnext.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

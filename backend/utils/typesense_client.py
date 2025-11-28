@@ -9,6 +9,8 @@ logger = logging.getLogger('backend')
 
 client = typesense.Client(settings.TYPESENSE_CONFIG)
 
+_phenotype_cache = None
+
 def get_client():
     """
     Returns the Typesense client.
@@ -18,10 +20,18 @@ def get_client():
 def get_phenotype_from_typesense(trait_id):
     client = get_client()
     doc = client.collections['autocomplete'].documents[trait_id].retrieve()
-    return(doc)
+    return doc
 
+def get_gene_from_typesense(gene_id):
+    client = get_client()
+    doc = client.collections['autocomplete'].documents[gene_id].retrieve()
+    return doc
 
 def get_all_phenotypes_from_typesense():
+    global _phenotype_cache
+    if _phenotype_cache is not None:
+        return _phenotype_cache
+
     client = get_client()
 
     all_documents = []
@@ -44,7 +54,7 @@ def get_all_phenotypes_from_typesense():
 
             all_documents.extend([hit["document"] for hit in hits])
             page += 1
-
+        _phenotype_cache = all_documents
         return all_documents
 
     except Exception as e:

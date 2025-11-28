@@ -35,8 +35,7 @@ class TopHitsView(generics.GenericAPIView):
             logger.error(f"Error opening Top Hits file {settings.TOP_HITS_FILE}: {e}")
             return JsonResponse({"error": "Failed to open Top Hits file"}, status=500)
 
-
-class MAGMAConfigView(generics.GenericAPIView):
+class ConfigView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         """
         Handles GET requests to the MAGMA API.
@@ -45,17 +44,11 @@ class MAGMAConfigView(generics.GenericAPIView):
             # Read JSON file of Nextflow parameters -> NF_PARAM_FILE
             with open(settings.NF_PARAM_FILE, "r") as f:
                 nf_params = json.load(f)
-            up, down = nf_params.get("magma_window_up"), nf_params.get("magma_window_down")
             magma_ref_pop = config("MAGMA_REF_POPULATION")
             magma_ref_gene_loc = config("MAGMA_REF_GENE_LOCATION")
-            final_dict = {
-                "magma_window_up": up,
-                "magma_window_down": down,
-                "magma_ref_pop": magma_ref_pop,
-                "magma_ref_gene_loc": magma_ref_gene_loc
-            }
-            return JsonResponse(final_dict)
+            nf_params["magma_ref_pop"] = magma_ref_pop
+            nf_params["magma_ref_gene_loc"] = magma_ref_gene_loc
+            return JsonResponse(nf_params)
         except:
             return JsonResponse({"error": "Failed to retrieve data"}, status=500)
-
 

@@ -1,3 +1,4 @@
+import contextlib
 from decouple import config
 import pysam
 from backend.utils.converters import convert_variant_id
@@ -7,8 +8,13 @@ import pandas as pd
 import os
 from backend.utils.VEP_consequences import VEP_RANK_DICT
 from django.conf import settings
+import struct
+import msgpack
+import lmdb
+from backend.utils.lmdb_gene_query import LMDBGeneQuery
 
 logger = logging.getLogger('backend')
+
 
 def get_most_severe(consequences):
     """
@@ -55,7 +61,6 @@ def extract_variant_annotation(variant_id):
         rows = []
         consequences = []
         location = chr + ":" + str(pos)
-        closest_gene = []
         transcript_dict = {}
         regulatory_dict = {}
         motif_dict = {}
@@ -65,8 +70,6 @@ def extract_variant_annotation(variant_id):
             info = row["INFO"].replace("CSQ=", "").split(",")
             info_dict = [dict(zip(anno_columns, i.split("|"))) for i in info]
             info_pd = pd.DataFrame(info_dict)
-            logger.info("Info DataFrame Columns:\n%s", info_pd.columns)
-            logger.info("Info DataFrame Sizes:\n%s", info_pd.shape)
 
             # Allele frequencies
             # rename keys to be more readable
@@ -111,7 +114,6 @@ def extract_variant_annotation(variant_id):
             else:
                 allele_frequencies = {}
 
-
             external_ids = info_pd["Existing_variation"].str.split("&").explode().drop_duplicates().tolist()
             consequences = info_pd["Consequence"].drop_duplicates().tolist()
             # transcript consequences
@@ -140,17 +142,10 @@ def extract_variant_annotation(variant_id):
             motif_dict = {"headers": motif_columns,
                                "rows": motif_consequences_dt.to_dict(orient="records")}
 
-            # Get closest genes
-            genes_pd = info_pd.dropna(subset = ["SYMBOL"])
-            if genes_pd.empty:
-                continue
-            # Rank by impact (high, moderate, low, modifier) and then by consequence using VEP_RANK_DICT
-            genes_pd["IMPACT_rank"] = genes_pd["IMPACT"].map({"HIGH": 1, "MODERATE": 2, "LOW": 3, "MODIFIER": 4})
-            genes_pd["Consequence_rank"] = genes_pd["Consequence"].apply(
-                lambda x: min([VEP_RANK_DICT.get(term, {"rank": float('inf')})["rank"] for term in x.split("&")]) if isinstance(x, str) else float('inf')
-            )
-            genes_pd = genes_pd.sort_values(by=["IMPACT_rank", "Consequence_rank", "DISTANCE"], ascending=[True, True, True])
-            closest_gene = genes_pd["SYMBOL"].drop_duplicates().to_list()
+            # Get closest genes from gene LMDB
+            with LMDBGeneQuery(settings.LMDB_GENE_FILE) as gene_query:
+                closest_genes = gene_query.get_genes_for_variant(chr, pos)
+            
             rows+= info_dict # TODO: check if this even happens that you get two rows of a VCF file for a single position
 
         msc, msc_impact = get_most_severe(consequences)
@@ -167,7 +162,7 @@ def extract_variant_annotation(variant_id):
         "transcript_consequences": transcript_dict if len(transcript_consequences_dt) > 0 else None,
         "regulatory_consequences": regulatory_dict if len(regulatory_consequences_dt) > 0 else None,
         "motif_consequences": motif_dict if len(motif_consequences_dt) > 0 else None,
-        "closest_gene": closest_gene if len(closest_gene) > 0 else None,
+        "closest_gene": closest_genes if len(closest_genes) > 0 else None,
         }
         return data
     except Exception as e:

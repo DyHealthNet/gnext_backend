@@ -43,9 +43,10 @@ class Command(BaseCommand):
             CONTAINER_NAME = config("VITE_TYPESENSE_HOST")
             PORT = config("VITE_TYPESENSE_PORT")
             API_KEY = config("VITE_TYPESENSE_KEY")
+            VOLUME_DIR = config("TYPESENSE_VOLUME_DIR")
 
             subprocess.run(
-                ["bash", "backend/utils/preprocessing/setup_typesense.sh", CONTAINER_NAME, PORT, API_KEY],
+                ["bash", "backend/utils/preprocessing/setup_typesense.sh", CONTAINER_NAME, PORT, API_KEY, VOLUME_DIR],
                 check=True
             )
 
@@ -88,7 +89,7 @@ class Command(BaseCommand):
     # Wait for Typesense health endpoint
     # -------------------------------------------------------------------------
     @staticmethod
-    def wait_for_typesense(host: str, port: str, api_key: str, timeout: int = 30):
+    def wait_for_typesense(host: str, port: str, api_key: str, timeout: int = 200):
         url = f"http://{host}:{port}/health"
         headers = {"X-TYPESENSE-API-KEY": api_key}
 
@@ -96,7 +97,7 @@ class Command(BaseCommand):
         start = time.time()
         while time.time() - start < timeout:
             try:
-                r = requests.get(url, headers=headers, timeout=2)
+                r = requests.get(url, headers=headers, timeout=200)
                 if r.ok:
                     logger.info("✅ Typesense is ready.")
                     return True
@@ -147,11 +148,14 @@ class Command(BaseCommand):
 
         Command.reset_collection_if_needed(client, "autocomplete")
 
+        ################### Import phenotypes ###################
         pheno_dt = pd.read_csv(pheno_file)
         for i, r in pheno_dt.iterrows():
             logger.info(f"Importing phenotype to typesense: {r['phenocode']}")
             if "external_id" not in r:
                 r["external_id"] = ""
+            if "nr_samples" not in r:
+                r["nr_samples"] = 0
 
             doc = {
                 "type": "trait",
@@ -165,9 +169,46 @@ class Command(BaseCommand):
             }
             client.collections["autocomplete"].documents.upsert(doc)
 
+        ################### Import genes ###################
+        logger.info(f"Reading gene file: {settings.GENE_FILE}")
+        mapped_genes = pd.read_csv(settings.GENE_FILE, sep="\t")
+        logger.info(f"Loaded {len(mapped_genes)} genes")
+        
+        documents = []
+        for i, r in mapped_genes.iterrows():
+            doc = {
+                "type": "gene",
+                "id": str(r["ensg_id"]),  # Keep ensg_id as unique ID
+                "label": str(r["symbol"]),  # Display symbol as label
+                "description": f"Chr {r['chr']}: {r['start']}-{r['end']} ({r['strand']})",
+                "external_ref": str(r["symbol"]),  # Store symbol in external_ref for routing
+                "category": "",
+                "filename": "",
+                "nr_samples": 0,
+            }
+            documents.append(doc)
+        
+        logger.info(f"Prepared {len(documents)} gene documents for import")
+        payload = "\n".join(json.dumps(doc) for doc in documents)
+        result = client.collections["autocomplete"].documents.import_(payload, {"action": "upsert"})
+        logger.info(f"Genes imported to typesense! Result: {result}")
+
+        ################### Import variants ###################
+        # First, parse the annotation columns from the VCF header
+        anno_columns = []
+        with gzip.open(GWAS_annotated_vcf_file, "rt") as vcf:
+            for line in vcf:
+                if line.startswith("##INFO") and "Format:" in line:
+                    anno_columns = line.strip().split("|")
+                    anno_columns[0] = anno_columns[0].split("Format: ")[1].split('"')[0]
+                    anno_columns[-1] = anno_columns[-1].strip('">')
+                    break
+
+        # Now process the variants
         documents = []
         batch_nr = 1
-        header = ""
+        header = []
+
         with gzip.open(GWAS_annotated_vcf_file, "rt") as vcf:
             for line in vcf:
                 if line.startswith("#CHROM"):
@@ -178,8 +219,14 @@ class Command(BaseCommand):
 
                 fields = line.strip().split("\t")
                 variant_dict = dict(zip(header, fields))
-                info = variant_dict["INFO"].split(",")
-                rs_ids = list(set([i.split("|")[17] for i in info]))
+
+                # Parse INFO field into structured dictionaries
+                info = variant_dict["INFO"].replace("CSQ=", "").split(",")
+                info_dict_list = [dict(zip(anno_columns, i.split("|"))) for i in info]
+
+                # Extract unique rs_ids from the parsed dictionaries
+                rs_ids = list(
+                    set([d.get("Existing_variation", "") for d in info_dict_list if d.get("Existing_variation", "")]))
                 rs_ids = ", ".join(rs_ids)
 
                 doc = {
@@ -201,7 +248,9 @@ class Command(BaseCommand):
                     documents.clear()
                     batch_nr += 1
 
+            # Import remaining documents
             if documents:
                 payload = "\n".join(json.dumps(doc) for doc in documents)
                 client.collections["autocomplete"].documents.import_(payload, {"action": "upsert"})
                 logger.info(f"Batch Nr. {batch_nr} imported to typesense!")
+

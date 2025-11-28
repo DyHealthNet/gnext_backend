@@ -10,6 +10,7 @@ set -euo pipefail
 CONTAINER_NAME=$1
 PORT=$2
 API_KEY=$3
+VOLUME_DIR=$4
 
 # --- Static config ---
 IMAGE="typesense/typesense:29.0.rc15"
@@ -28,9 +29,18 @@ echo "Starting setup for Typesense container '${CONTAINER_NAME}'..."
 echo "Pulling image '${IMAGE}'..."
 docker pull "${IMAGE}"
 
+# Create directory for volume
+echo "Creating data directory at '${VOLUME_DIR}'..."
+mkdir -p "${VOLUME_DIR}"
+
 # Create volume if not exists
-echo "Creating Docker volume '${VOLUME_NAME}' (if not exists)..."
-docker volume create "${VOLUME_NAME}" > /dev/null
+echo "Creating Docker volume '${VOLUME_NAME}' at '${VOLUME_DIR}'..."
+docker volume create \
+    --driver local \
+    --opt type=none \
+    --opt device="${VOLUME_DIR}" \
+    --opt o=bind \
+    "${VOLUME_NAME}" > /dev/null
 
 # Run container
 echo "Launching Typesense container '${CONTAINER_NAME}'..."
