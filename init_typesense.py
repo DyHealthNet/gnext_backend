@@ -231,7 +231,7 @@ def import_variants(client, vcf_file, batch_size):
 def main():
     try:
         # Get configuration from environment
-        TYPESENSE_HOST = config("VITE_TYPESENSE_HOST")
+        TYPESENSE_HOST = config("VITE_TYPESENSE_HOST", default="localhost")
         TYPESENSE_PORT = config("VITE_TYPESENSE_PORT")
         TYPESENSE_KEY = config("VITE_TYPESENSE_KEY")
         PHENO_FILE = config("PHENO_FILE")

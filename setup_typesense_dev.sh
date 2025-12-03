@@ -11,27 +11,48 @@ if [[ "${1:-}" == "--pull" ]]; then
 fi
 
 # Load environment variables from .env file
-if [ -f ../.env ]; then
-    export $(grep -v '^#' ../.env | xargs)
-else
-    echo "Error: .env file not found in parent directory"
-    exit 1
-fi
+load_env() {
+    local env_file="../.env"
+    if [ -f "$env_file" ]; then
+        echo "Loading environment from $env_file"
+        # Read only simple key=value pairs, ignore complex multi-line values
+        while IFS='=' read -r key value; do
+            # Skip empty lines, comments, and malformed lines
+            [[ -z "$key" || "$key" =~ ^[[:space:]]*# || "$key" =~ [[:space:]] ]] && continue
+            # Only process valid environment variable names
+            if [[ "$key" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+                # Remove quotes if present and export
+                value="${value%\"}"
+                value="${value#\"}"
+                export "$key=$value"
+            fi
+        done < <(grep -E '^[A-Z_][A-Z0-9_]*=' "$env_file" | head -20)
+    else
+        echo "Error: .env file not found at $env_file"
+        exit 1
+    fi
+}
+
+load_env
 
 # --- Configuration ---
-CONTAINER_NAME="${VITE_TYPESENSE_HOST}"
+# Use defaults for development (VITE_TYPESENSE_HOST defaults to localhost, not from .env)
+TYPESENSE_HOST="${VITE_TYPESENSE_HOST:-localhost}"
+CONTAINER_NAME="gnext-typesense-${STUDY_ACRONYM:-dev}"
 PORT="${VITE_TYPESENSE_PORT:-8108}"
 API_KEY="${VITE_TYPESENSE_KEY}"
-VOLUME_DIR="${TYPESENSE_DATA_DIR:-../typesense_volume}"
+VOLUME_DIR="${TYPESENSE_VOLUME_DIR:-$(realpath ../typesense_volume)}"
 IMAGE="typesense/typesense:29.0.rc15"
 
 echo "================================"
 echo "Typesense Development Setup"
 echo "================================"
 echo "Container: ${CONTAINER_NAME}"
+echo "Host: ${TYPESENSE_HOST}"
 echo "Port: ${PORT}"
 echo "Volume: ${VOLUME_DIR}"
 echo "Image: ${IMAGE}"
+echo "Study: ${STUDY_ACRONYM:-dev}"
 echo "================================"
 
 # Check if the container is already running
