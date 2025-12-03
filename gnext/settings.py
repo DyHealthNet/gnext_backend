@@ -21,22 +21,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-m+8s58hud9#cjl_bvnkg9q+91yby*nujl%c!8%0f7eq(nte&4#'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-m+8s58hud9#cjl_bvnkg9q+91yby*nujl%c!8%0f7eq(nte&4#')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*', cast=lambda v: [s.strip() for s in v.split(',')])
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
+    # 'django.contrib.admin',        # Removed - no admin interface needed
+    # 'django.contrib.auth',          # Removed - no authentication needed
+    # 'django.contrib.contenttypes',  # Removed - no database models
+    # 'django.contrib.sessions',      # Removed - stateless API
+    # 'django.contrib.messages',      # Removed - no user messages
     'django.contrib.staticfiles',
     'rest_framework',
     'django_extensions',
@@ -46,16 +46,19 @@ INSTALLED_APPS = [
 
 REST_FRAMEWORK = {
     'URL_FORMAT_OVERRIDE': None,
+    'DEFAULT_AUTHENTICATION_CLASSES': [],  # Disable authentication
+    'DEFAULT_PERMISSION_CLASSES': [],      # Disable permissions
+    'UNAUTHENTICATED_USER': None,          # Don't use auth models
 }
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # ✅ must be above CommonMiddleware
     'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    # 'django.contrib.sessions.middleware.SessionMiddleware',      # Removed - no sessions
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',                 # Removed - stateless API
+    # 'django.contrib.auth.middleware.AuthenticationMiddleware',   # Removed - no auth
+    # 'django.contrib.messages.middleware.MessageMiddleware',      # Removed - no messages
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -74,8 +77,8 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+                # 'django.contrib.auth.context_processors.auth',       # Removed - no auth
+                # 'django.contrib.messages.context_processors.messages', # Removed - no messages
             ],
         },
     },
@@ -86,11 +89,12 @@ WSGI_APPLICATION = 'gnext.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+# Not using any database - all data is file-based (BGZ, LMDB) and Typesense
 
 DATABASES = {
+    # Dummy database config to keep Django happy
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.dummy'
     }
 }
 
@@ -138,9 +142,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # where collectstatic will 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Typesense config
+# Host defaults to localhost for development, Docker overrides via environment variables
 TYPESENSE_CONFIG = {
     "nodes": [{
-        "host": config("VITE_TYPESENSE_HOST"),
+        "host": config("VITE_TYPESENSE_HOST", default="localhost"),
         "port": config("VITE_TYPESENSE_PORT"),
         "protocol": "http"
     }],
