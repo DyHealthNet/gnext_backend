@@ -1,7 +1,7 @@
 # GNExT Platform - Backend
 
 <div align="center">
-  <img src="src/assets/figures/GNExT_Logo_Black.png" alt="GNExT Logo" width="400"/>
+  <img width="400"alt="GNExT_Logo_Black" src="https://github.com/user-attachments/assets/f2df3b30-20ef-4066-8dd5-9db2e2183473" />
   <p><em>GWAS Network Exploration Tool</em></p>
 </div>
 
