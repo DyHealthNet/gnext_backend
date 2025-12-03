@@ -15,7 +15,8 @@ fi
 
 # Django housekeeping
 python manage.py collectstatic --noinput || true
-python manage.py migrate --noinput
+# Skip migrations - we use a dummy database (no models)
+# python manage.py migrate --noinput
 
 # Hand off to CMD
 exec "$@"

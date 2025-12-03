@@ -194,13 +194,13 @@ class MAGMAView(generics.GenericAPIView):
             magma_filepath = os.path.join(settings.MAGMA_RESULTS_DIR, trait_id + "_magma.genes.out")
             magma_data = pd.read_csv(magma_filepath, delim_whitespace=True)
             # rename columns
-            magma_data = magma_data.rename(columns={"GENE": "Gene", "CHR": "Chrom", "START": "Start", "STOP": "End", "NSNPS": "#SNPs", "P": "Pvalue", "ZSTAT": "Zvalue", "SYMBOL":"Symbol"})
+            magma_data = magma_data.rename(columns={"GENE": "gene_id", "CHR": "chrom", "START": "start", "STOP": "end", "NSNPS": "#SNPs", "P": "pvalue", "ZSTAT": "zvalue", "SYMBOL":"gene_symbol"})
             # drop N and NPARAM column
             magma_data = magma_data.drop(columns=["N", "NPARAM"])
             # add -log10 pvalue column
-            magma_data["-Log10(Pvalue)"] = -1 * np.log10(magma_data["Pvalue"])
-            magma_data["Bonferroni Pvalue"] = magma_data["Pvalue"] * len(magma_data)
-            magma_data = magma_data.sort_values(by="Pvalue")
+            magma_data["-log10(pvalue)"] = -1 * np.log10(magma_data["pvalue"])
+            magma_data["bonferroni_pvalue"] = magma_data["pvalue"] * len(magma_data)
+            magma_data = magma_data.sort_values(by="pvalue")
             final_dict = {
                 "rows": magma_data.to_dict(orient='records'),
                 "header": list(magma_data.columns),
