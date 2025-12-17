@@ -399,6 +399,9 @@ def extract_gene_signals(chr, start, end, strand, gene_id=None, max_rows = 100):
     signals_df = signals_df.sort_values("neg_log_pvalue", ascending=False)
     signals_df = signals_df.groupby("trait_name", as_index=False).first()
 
+    # Sort again by neg_log_pvalue after grouping (descending = most significant first)
+    signals_df = signals_df.sort_values("neg_log_pvalue", ascending=False)
+
     # Limit by max_rows (top N traits)
     signals_df = signals_df.head(max_rows)
 

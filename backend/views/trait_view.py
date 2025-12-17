@@ -201,6 +201,8 @@ class MAGMAView(generics.GenericAPIView):
             magma_data["-log10(pvalue)"] = -1 * np.log10(magma_data["pvalue"])
             magma_data["bonferroni_pvalue"] = magma_data["pvalue"] * len(magma_data)
             magma_data = magma_data.sort_values(by="pvalue")
+            # replace NA and inf values with None
+            magma_data = magma_data.replace([np.nan, np.inf, -np.inf], None)
             final_dict = {
                 "rows": magma_data.to_dict(orient='records'),
                 "header": list(magma_data.columns),
