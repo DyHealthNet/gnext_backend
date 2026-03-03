@@ -28,6 +28,7 @@ logger = logging.getLogger("backend")
 # Cache for NF params
 _nf_params_cache = None
 
+
 def get_nf_params():
     """Load NF params file once and cache in memory."""
     global _nf_params_cache
@@ -272,18 +273,9 @@ def stream_filtered_variants(path, neg_log_cutoff="5e-8"):
     awk_proc.stdout.close()
     awk_proc.wait()
 
-def extract_gene_signals(chr, start, end, strand, gene_id=None, max_rows = 100):
-    # Paths to metric files
-    metric_files = {
-        "neg_log_pvalue": f"{settings.CHR_BGZ_DIR}/chr_{chr}_neg_log_pvalue.tsv.bgz",
-        "beta": f"{settings.CHR_BGZ_DIR}/chr_{chr}_beta.tsv.bgz",
-        "stderr_beta": f"{settings.CHR_BGZ_DIR}/chr_{chr}_stderr_beta.tsv.bgz",
-        "alt_allele_freq": f"{settings.CHR_BGZ_DIR}/chr_{chr}_alt_allele_freq.tsv.bgz",
-    }
-
+def extract_gene_signals(chr, start, end, strand, gene_id=None, max_rows=100):
     # Get NF params from cache
     nf_params = get_nf_params()
-
     window_up = int(nf_params["window_up"]) * 1000
     window_down = int(nf_params["window_down"]) * 1000
 
@@ -295,165 +287,165 @@ def extract_gene_signals(chr, start, end, strand, gene_id=None, max_rows = 100):
         region_start = max(0, start - window_down)
         region_end = end + window_up
 
-    # Extract data from all metric files
-    data_by_variant = {}
-
-    with pysam.TabixFile(metric_files["neg_log_pvalue"]) as tbx_p:
+    # STEP 1: Get neg_log_pvalue data and find top variant per trait
+    neg_log_file = f"{settings.CHR_BGZ_DIR}/chr_{chr}_neg_log_pvalue.tsv.bgz"
+    
+    top_variants_per_trait = {}  # trait_name -> {variant_id, pos, neg_log_pvalue}
+    trait_names = None
+    
+    with pysam.TabixFile(neg_log_file) as tbx:
         # Get trait names from header
-        header_line = tbx_p.header[0].lstrip("#")
+        header_line = tbx.header[0].lstrip("#")
         trait_names = header_line.split("\t")[5:]
-
-        # Fetch variants
-        cand_lines = list(tbx_p.fetch(chr, region_start, region_end))
-
-        if not cand_lines:
-            return None
-
-        for line in cand_lines:
-            fields = line.split("\t")
-            variant_id = fields[4]
-            # Convert "." to None, keep the same length as trait_names
-            data_by_variant[variant_id] = {
-                "chr": fields[0],
-                "pos": int(fields[1]),
-                "ref": fields[2],
-                "alt": fields[3],
-                "neg_log_pvalue": [float(x) if x != "." else None for x in fields[5:]]
-            }
-
-    # Extract beta values
-    with pysam.TabixFile(metric_files["beta"]) as tbx:
+        
+        # Fetch all variants in region
         for line in tbx.fetch(chr, region_start, region_end):
             fields = line.split("\t")
             variant_id = fields[4]
-            if variant_id in data_by_variant:
-                data_by_variant[variant_id]["beta"] = [float(x) if x != "." else None for x in fields[5:]]
-
-    # Extract stderr_beta values
-    with pysam.TabixFile(metric_files["stderr_beta"]) as tbx:
-        for line in tbx.fetch(chr, region_start, region_end):
-            fields = line.split("\t")
-            variant_id = fields[4]
-            if variant_id in data_by_variant:
-                data_by_variant[variant_id]["stderr_beta"] = [float(x) if x != "." else None for x in fields[5:]]
-
-    # Extract alt_allele_freq values
-    with pysam.TabixFile(metric_files["alt_allele_freq"]) as tbx:
-        for line in tbx.fetch(chr, region_start, region_end):
-            fields = line.split("\t")
-            variant_id = fields[4]
-            if variant_id in data_by_variant:
-                data_by_variant[variant_id]["alt_allele_freq"] = [float(x) if x != "." else None for x in fields[5:]]
-
-    # Build long format dataframe
-    rows = []
-    for variant_id, variant_data in data_by_variant.items():
-        # Determine location relative to gene
-        variant_pos = variant_data["pos"]
-        # Determine location relative to gene (strand-aware)
+            pos = int(fields[1])
+            ref = fields[2]
+            alt = fields[3]
+            
+            
+            # Parse p-values for all traits
+            pvalues = fields[5:]
+            
+            # For each trait, check if this is the top variant
+            for i, trait_name in enumerate(trait_names):
+                pval = pvalues[i]
+                
+                # Skip if no p-value
+                if pval is None:
+                    continue
+                if pval is ".": 
+                    continue
+                
+                # Check if this is better than current top for this trait
+                if (trait_name not in top_variants_per_trait or 
+                    pval > top_variants_per_trait[trait_name]['neg_log_pvalue']):
+                    top_variants_per_trait[trait_name] = {
+                        'variant_id': variant_id,
+                        'chr': chr,
+                        'pos': pos,
+                        'ref': ref,
+                        'alt': alt,
+                        'neg_log_pvalue': pval,
+                        'trait_idx': i
+                    }
+    
+    if not top_variants_per_trait:
+        return None
+    
+    logger.info(f"Found top variants for {len(top_variants_per_trait)} traits")
+    
+    # STEP 2: Sort traits by significance
+    sorted_traits = sorted(
+        top_variants_per_trait.items(),
+        key=lambda x: x[1]['neg_log_pvalue'],
+        reverse=True
+    )
+    
+    # Get set of unique variant IDs we need additional data for
+    needed_variant_ids = {item[1]['variant_id'] for item in sorted_traits}
+    
+    # STEP 3: Fetch additional metrics only for needed variants
+    metric_files = {
+        "beta": f"{settings.CHR_BGZ_DIR}/chr_{chr}_beta.tsv.bgz",
+        "stderr_beta": f"{settings.CHR_BGZ_DIR}/chr_{chr}_stderr_beta.tsv.bgz",
+        "alt_allele_freq": f"{settings.CHR_BGZ_DIR}/chr_{chr}_alt_allele_freq.tsv.bgz",
+    }
+    
+    # Store additional metrics: variant_id -> {metric_name -> values}
+    variant_metrics = {vid: {} for vid in needed_variant_ids}
+    
+    for metric_name, filepath in metric_files.items():
+        with pysam.TabixFile(filepath) as tbx:
+            for line in tbx.fetch(chr, region_start, region_end):
+                fields = line.split("\t")
+                variant_id = fields[4]
+                
+                # Only process if we need this variant
+                if variant_id in needed_variant_ids:
+                    variant_metrics[variant_id][metric_name] = fields[5:]
+    # STEP 4: Build rows only for top variants
+    def get_location_and_distance(pos):
         if strand == "+":
-            # Positive strand: gene goes 5' -> 3' in increasing coordinates
-            if variant_pos < start:
-                location = "upstream"
-                distance = start - variant_pos
-            elif variant_pos > end:
-                location = "downstream"
-                distance = variant_pos - end
+            if pos < start:
+                return "upstream", start - pos
+            elif pos > end:
+                return "downstream", pos - end
             else:
-                location = "within_gene"
-                distance = 0
+                return "within_gene", 0
         else:
-            # Negative strand: gene goes 5' -> 3' in decreasing coordinates
-            if variant_pos > end:
-                location = "upstream"  # Higher coordinate = upstream on negative strand
-                distance = variant_pos - end
-            elif variant_pos < start:
-                location = "downstream"  # Lower coordinate = downstream on negative strand
-                distance = start - variant_pos
+            if pos > end:
+                return "upstream", pos - end
+            elif pos < start:
+                return "downstream", start - pos
             else:
-                location = "within_gene"
-                distance = 0
-
-        for i, trait_name in enumerate(trait_names):
-            rows.append({
-                "variant_id": f"{variant_data['chr']}_{variant_data['pos']}_{variant_data['ref']}/{variant_data['alt']}",
-                "chr": variant_data["chr"],
-                "pos": variant_data["pos"],
-                "ref": variant_data["ref"],
-                "alt": variant_data["alt"],
-                "location": location,
-                "distance": distance,
-                "trait_name": trait_name,
-                "neg_log_pvalue": variant_data["neg_log_pvalue"][i],
-                "beta": variant_data.get("beta", [None] * len(trait_names))[i],
-                "stderr_beta": variant_data.get("stderr_beta", [None] * len(trait_names))[i],
-                "alt_allele_freq": variant_data.get("alt_allele_freq", [None] * len(trait_names))[i],
-            })
-
+                return "within_gene", 0
+    
+    rows = []
+    for trait_name, variant_data in sorted_traits:
+        variant_id = variant_data['variant_id']
+        trait_idx = variant_data['trait_idx']
+        loc, dist = get_location_and_distance(variant_data['pos'])
+        
+        # Get additional metrics for this variant
+        metrics = variant_metrics.get(variant_id, {})
+        
+        rows.append({
+            "trait_id": trait_name,
+            "top_variant": f"{variant_data['chr']}_{variant_data['pos']}_{variant_data['ref']}/{variant_data['alt']}",
+            "neg_log_pvalue": variant_data['neg_log_pvalue'],
+            "beta": metrics.get('beta', [None] * len(trait_names))[trait_idx],
+            "stderr_beta": metrics.get('stderr_beta', [None] * len(trait_names))[trait_idx],
+            "alt_allele_freq": metrics.get('alt_allele_freq', [None] * len(trait_names))[trait_idx],
+            "location": loc,
+            "distance": dist,
+        })
+    
+    # Create DataFrame
     signals_df = pd.DataFrame(rows)
-
-    # Filter out rows with None p-values
-    signals_df = signals_df[signals_df["neg_log_pvalue"].notna()]
-
-    # Group by trait and get the top variant (highest neg_log_pvalue) for each trait
-    signals_df = signals_df.sort_values("neg_log_pvalue", ascending=False)
-    signals_df = signals_df.groupby("trait_name", as_index=False).first()
-
-    # Sort again by neg_log_pvalue after grouping (descending = most significant first)
-    signals_df = signals_df.sort_values("neg_log_pvalue", ascending=False)
-
-    # Limit by max_rows (top N traits)
-    signals_df = signals_df.head(max_rows)
-
-    # Get phenotype descriptions
-    phenotypes = get_all_phenotypes_from_typesense()
-    phenotypes_df = pd.DataFrame(phenotypes)
-
-    # Merge signals_df and phenotypes_df to get trait descriptions
+    
+    # Get phenotype descriptions and merge
+    phenotypes_df = pd.DataFrame(get_all_phenotypes_from_typesense())
     signals_df = signals_df.merge(
-        phenotypes_df,
-        left_on='trait_name',
+        phenotypes_df[['id', 'description']],
+        left_on='trait_id',
         right_on='id',
         how='left'
+    ).rename(columns={'description': 'trait_label'})
+    
+    # Calculate p-value (handle Infinity -> 0)
+    signals_df['pvalue'] = signals_df['neg_log_pvalue'].apply(
+        lambda x: 0.0 if math.isinf(float(x)) else 10 ** (-float(x))
     )
 
-    # Add p-value column
-    signals_df['pvalue'] = signals_df['neg_log_pvalue'].apply(lambda x: np.power(10, -x) if pd.notnull(x) else None)
-
-    # Rename signals
-    signals_df = signals_df.rename(columns={"variant_id": "top_variant", "trait_name": "trait_id", "label": "trait_label"})
-    signals_df = signals_df[["trait_id", "trait_label", "top_variant", "beta", "stderr_beta", "alt_allele_freq","pvalue", "neg_log_pvalue", "location", "distance"]]
-
-    # Rename NaN to ""
+    
+    # Select final columns
+    signals_df = signals_df[["trait_id", "trait_label", "top_variant", "beta", 
+                             "stderr_beta", "alt_allele_freq", "pvalue", 
+                             "neg_log_pvalue", "location", "distance"]]
+    
     signals_df = signals_df.fillna("")
     
-    # Add MAGMA gene p-values if ensg_id is provided
-    # Only if MAGMA in .env
-    if config("VITE_MAGMA_SHOW", default="false").lower() == "true":
+    # Add MAGMA gene p-values if enabled
+    if config("VITE_MAGMA_SHOW", default="false").lower() == "true" and gene_id:
         try:
-            magma_bgz_file = settings.GENE_MAGMA_BGZ_FILE
-            magma_index_file = settings.GENE_MAGMA_INDEX_FILE
-
-            with LMDBGeneMAGMAQuery(magma_index_file, magma_bgz_file) as query:
+            with LMDBGeneMAGMAQuery(settings.GENE_MAGMA_INDEX_FILE, 
+                                   settings.GENE_MAGMA_BGZ_FILE) as query:
                 magma_result = query.get_gene_magma_pvalues(gene_id)
             
             if magma_result:
-                # Create a dict mapping trait_id -> magma_pvalue
                 magma_pval_map = {
-                    tp['trait_id']: tp['pvalue'] 
-                    for tp in magma_result['trait_pvalues'] 
+                    tp['trait_id']: tp['pvalue']
+                    for tp in magma_result['trait_pvalues']
                     if tp['pvalue'] is not None
                 }
-                
-                # Add MAGMA p-values to signals_df
                 signals_df['MAGMA P-value'] = signals_df['trait_id'].map(magma_pval_map)
-                
-                logger.info(f"Added MAGMA p-values for {len(magma_pval_map)} traits for gene {gene_id}")
-            else:
-                logger.warning(f"No MAGMA data found for gene {gene_id}")
-        
+                logger.info(f"Added MAGMA p-values for {len(magma_pval_map)} traits")
         except Exception as e:
-            logger.error(f"Error adding MAGMA p-values for gene {gene_id}: {e}")
+            logger.error(f"Error adding MAGMA p-values: {e}")
 
     return signals_df
 
@@ -484,6 +476,9 @@ def extract_region_associations(trait_id, chr, start, end):
     # Transform to LocusZoom format
     variants = []
     for row in result["rows"]:
+        if math.isinf(float(row['neg_log_pvalue'])):
+            row['neg_log_pvalue'] = -math.log10(5e-08)
+
         variant = {
             "chromosome": row["chrom"],
             "position": int(row["pos"]),
@@ -492,7 +487,7 @@ def extract_region_associations(trait_id, chr, start, end):
             "variant": row["chrom"] + ":" + str(row["pos"]) + "_" + row["ref"] + "/" + row["alt"],
             "id": row["chrom"] + "_" + str(row["pos"]) + "_" + row["ref"] + "/" + row["alt"],
             "pvalue": row["pvalue"],
-            "log_pvalue": float(row["neg_log_pvalue"]) if row["neg_log_pvalue"] not in (".", None) else None,
+            "log_pvalue": float(row["neg_log_pvalue"]) if row["neg_log_pvalue"] not in (".", None, "Infinity", math.inf) else None,
             "nearest_genes": row.get("nearest_genes", "")
         }
 

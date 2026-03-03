@@ -35,6 +35,7 @@ conda activate gnext_backend
 pip install -r requirements.txt
 
 # Initialize Typesense (if needed)
+bash setup_typesense_dev.sh
 python init_typesense.py
 
 # Start development server

@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from decouple import config
 from numpy import number
 from rest_framework import generics
@@ -30,7 +30,9 @@ class TopHitsView(generics.GenericAPIView):
         try:
             with open(settings.TOP_HITS_FILE, "r") as f:
                 top_hits = json.load(f)
-            return JsonResponse(top_hits, safe=False)
+                # Make neg_log_pvalue = Infinity to string for JSON serialization
+                json_str = json.dumps(top_hits).replace('Infinity', '"Infinity"')
+            return HttpResponse(json_str, content_type="application/json")
         except Exception as e:
             logger.error(f"Error opening Top Hits file {settings.TOP_HITS_FILE}: {e}")
             return JsonResponse({"error": "Failed to open Top Hits file"}, status=500)

@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from backend.utils.extract_data_from_GWAS import extract_variants_for_range, get_all_sign_variants_cutoff
 from backend.utils.extract_data_from_manhattan import get_hits, wrap_generator_to_table_format
 from backend.utils.converters import convert_variant_id
@@ -33,7 +33,8 @@ class ManhattanView(generics.GenericAPIView):
             manhattan_filepath = os.path.join(settings.MANHATTAN_DIR, phenocode + "_manhattan.json")
             with open(manhattan_filepath, "r") as f:
                 manhattan_data = json.load(f)
-            return JsonResponse(manhattan_data)
+                json_str = json.dumps(manhattan_data).replace('Infinity', '"Infinity"')
+            return HttpResponse(json_str, content_type="application/json")
         else:
             logger.error(f"No phenotype found for trait: {trait_id}")
             return JsonResponse({"error": "Trait not found"}, status=404)
@@ -119,7 +120,8 @@ class TraitView(generics.GenericAPIView):
         if data is None:
             return JsonResponse({"error": "No variants found for the given trait."}, status=404)
         else:
-            return JsonResponse(data)
+            json_str = json.dumps(data).replace('Infinity', '"Infinity"')
+            return HttpResponse(json_str, content_type="application/json")
 
 class ChromosomeBoundsView(generics.GenericAPIView):
 

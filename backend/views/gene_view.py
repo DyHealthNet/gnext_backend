@@ -1,7 +1,8 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from rest_framework import generics
 import logging
 import re
+import json
 
 from backend.utils.extract_data_from_GWAS import extract_gene_signals, extract_region_associations
 from backend.utils.typesense_client import get_gene_from_typesense
@@ -40,8 +41,11 @@ class GeneTopSignals(generics.GenericAPIView):
         Handles GET requests to the PheWAS API.
         """
         gene_id = request.GET.get("id")
+        logger.info("Received gene ID: %s", gene_id)
+
         # Lookup gene positions
         gene_info = get_gene_from_typesense(gene_id)
+        logger.info("Gene info retrieved from Typesense: %s", gene_info)
         pattern = r"Chr\s*(\w+):\s*(\d+)\s*-\s*(\d+)\s*\(([-+])\)"
         m = re.match(pattern, gene_info["description"])
         if m:
@@ -57,7 +61,9 @@ class GeneTopSignals(generics.GenericAPIView):
                 "rows": top_signals.to_dict(orient="records"),
                 "header": top_signals.columns.tolist(),
             }
-            return JsonResponse(data)
+            # Make neg_log_pvalue = Infinity to string for JSON serialization
+            json_str = json.dumps(data).replace('Infinity', '"Infinity"')
+            return HttpResponse(json_str, content_type="application/json")
 
 class GeneAssociationDataView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
@@ -68,6 +74,7 @@ class GeneAssociationDataView(generics.GenericAPIView):
         chr = request.GET.get('chr')
         start = request.GET.get('start')
         end = request.GET.get('end')
+        logger.info(f"Received parameters: trait_id={trait_id}, chr={chr}, start={start}, end={end}")
         
         if not all([trait_id, chr, start, end]):
             return JsonResponse({"error": "Missing required parameters"}, status=400)

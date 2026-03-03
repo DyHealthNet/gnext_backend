@@ -104,6 +104,9 @@ def reset_collection_if_needed(client, collection_name, force_reset=False):
         else:
             logger.info(f"No existing documents found in {collection_name}.")
         
+        # Add time to let typesense fully reset before importing new data -> 30 seconds
+        time.sleep(30)
+        
         return True  # Signal to proceed with import
     except Exception as e:
         logger.error(f"Error resetting collection {collection_name}: {e}")
@@ -201,7 +204,7 @@ def import_variants(client, vcf_file, batch_size):
             rs_ids = list(
                 set([d.get("Existing_variation", "") for d in info_dict_list if d.get("Existing_variation", "")]))
             rs_ids = ", ".join(rs_ids)
-
+        
             doc = {
                 "type": "variant",
                 "id": f"{variant_dict['CHROM']}_{variant_dict['POS']}_{variant_dict['REF']}/{variant_dict['ALT']}",
@@ -239,7 +242,7 @@ def main():
         
         # Get file paths from Django-like settings
         NF_DATA_DIR = config("NF_DATA_DIR")
-        ANNO_VCF_FILE = os.path.join(NF_DATA_DIR, "annotate/full_variants.vcf.gz")
+        ANNO_VCF_FILE = os.path.join(NF_DATA_DIR, "annotate/out/annotated_full_variants.vcf.gz")
         GENE_FILE = os.path.join(NF_DATA_DIR, "lmdb_gene/mapped_genes.tsv")
         
         logger.info("=" * 70)
