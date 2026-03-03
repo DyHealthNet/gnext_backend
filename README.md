@@ -65,4 +65,7 @@ Please have a look at the [GNExT Platform](https://github.com/DyHealthNet/gnext_
 
 
 ## Citation
-TBA
+
+Bridging the gap between genome-wide association studies and network medicine with GNExT
+Lis Arend, Fabian Woller, Bastienne Rehor, David Emmert, Johannes Frasnelli, Christian Fuchsberger, David B. Blumenthal, Markus List
+bioRxiv 2026.01.30.702559; doi: https://doi.org/10.64898/2026.01.30.702559
